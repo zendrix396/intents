@@ -1,0 +1,30 @@
+# .gitignore
+
+# General
+.DS_Store
+.env
+.env*.local
+*.log
+
+# Node
+/packages/frontend/node_modules
+/packages/frontend/.next
+/packages/frontend/out
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust
+/packages/solver/target
+/packages/programs/*/target
+/target
+Cargo.lock
+
+# Python
+__pycache__/
+*.pyc
+.venv
+.idea
+
+# Solana
+/test-ledger
