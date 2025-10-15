@@ -31,4 +31,16 @@ You should see a startup message and a dummy priority fee printed. Tests validat
 - Solver: add HTTP API (Axum) and Solana RPC/Jito fee polling
 - Services: data collection API and simple heuristic endpoint
 
-Contributions: open an issue first, get assigned and create a PR against `main` with branch name `feature/your-feature-name`. Keep changes scoped and add tests where feasible.
+## Contributions: 
+- open an issue first (select relevant tags), or select from the one already available and get assigned before sending the PR 
+- create a PR against `main` with branch name `feature/your-feature-name`. Keep changes scoped and add tests where feasible.
+- in PR, in 3 bullet points explain the changes, write `fixes #<issue-number>` on the top of PR message and send the merge request.
+- always keep your local fork up to date with the original one before sending PR.
+**Commands**:
+```bash
+ git remote add upstream https://github.com/zendrix396/intents
+ git remote -v
+ git fetch upstream
+ git merge upstream/main
+ git push -u origin feature/<your-feature>
+```
