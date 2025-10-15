@@ -1,4 +1,4 @@
-# Solana Intents (MVP)
+# Solana Intents
 
 An intent-centric execution layer for Solana. This repo currently includes a minimal Rust solver crate and CI to build/test it. More packages (frontend, services, on-chain) will be added incrementally.
 
