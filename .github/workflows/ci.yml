@@ -13,19 +13,31 @@ on:
       - 'docs/**'
 
 jobs:
-  solver:
+  rust-ci:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./packages/solver-core
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          components: clippy, rustfmt
+
+      # Issue #3: Add caching to speed up builds
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      # - name: Check formatting
+        # run: cargo fmt -- --check
+
+      - name: Lint code
+        run: cargo clippy --workspace -- -D warnings
+
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --workspace --verbose
+
       - name: Test
-        run: cargo test --verbose
+        run: cargo test --workspace --verbose
