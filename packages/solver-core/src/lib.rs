@@ -1,5 +1,4 @@
-
-pub async fn fetch_priority_fees() -> Result<u64, ()>{
+pub async fn fetch_priority_fees() -> Result<u64, ()> {
     Ok(100_000)
 }
 
