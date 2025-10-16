@@ -15,7 +15,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Rust
-/packages/solver/target
+/packages/solver-core/target
+/packages/solver-service/target
 /packages/programs/*/target
 /target
 Cargo.lock

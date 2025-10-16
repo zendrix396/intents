@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./packages/solver
+        working-directory: ./packages/solver-core
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

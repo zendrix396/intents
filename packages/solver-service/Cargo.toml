@@ -1,0 +1,11 @@
+[package]
+name = "solver-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# The service still needs tokio for the #[tokio::main] macro.
+tokio = { version = "1", features = ["full"] }
+
+# Add the local solver-core library as a dependency.
+solver-core = { path = "../solver-core" }
