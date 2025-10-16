@@ -4,8 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# The service still needs tokio for the #[tokio::main] macro.
+# The service runtime and web framework
 tokio = { version = "1", features = ["full"] }
+axum = "0.7.5"
+serde_json = "1"
 
-# Add the local solver-core library as a dependency.
+# Local solver core library
 solver-core = { path = "../solver-core" }
+
+[dev-dependencies]
+tower = "0.5"
