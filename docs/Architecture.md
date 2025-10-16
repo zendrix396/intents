@@ -10,30 +10,31 @@ The system is composed of several key packages that interact to translate a user
 
 ```mermaid
 graph TD
-    A[Frontend (Next.js)]
+    A[Frontend<br/>(Next.js)];
 
     subgraph Off-Chain Infrastructure
-        B[Solver Service (Axum API)]
-        C[Solver Core (Rust Library)]
+        B[Solver Service<br/>(Axum API)]
+        C[Solver Core<br/>(Rust Library)]
     end
 
     subgraph Solana Network
         D[RPC Node]
-        E[On-Chain Programs (e.g., Jupiter, Raydium)]
+        E[On-Chain Programs<br/>(Jupiter, Raydium)]
     end
 
-    A -- "1. User submits intent (JSON)" --> B
-    B -- "2. Validates & passes intent" --> C
-    C -- "3. Queries state & prices" --> D
-    C -- "4. Simulates execution paths" --> D
-    C -- "5. Returns optimal solution (Transaction)" --> B
-    B -- "6. Signs & sends transaction" --> D
-    D -- "7. Relays to network" --> E
+    A -->|1. User submits intent (JSON)| B
+    B -->|2. Validates & passes intent| C
+    C -->|3. Queries state & prices| D
+    C -->|4. Simulates execution paths| D
+    C -->|5. Returns optimal solution (Tx)| B
+    B -->|6. Signs & sends transaction| D
+    D -->|7. Relays to network| E
 
-    style A fill:#cde4ff
-    style B fill:#d2ffd2
-    style C fill:#f2d2ff
-    style E fill:#ffcdd2
+    style A fill:#cde4ff,stroke:#333,stroke-width:1px
+    style B fill:#d2ffd2,stroke:#333,stroke-width:1px
+    style C fill:#f2d2ff,stroke:#333,stroke-width:1px
+    style D fill:#fff0c2,stroke:#333,stroke-width:1px
+    style E fill:#ffcdd2,stroke:#333,stroke-width:1px
 ```
 
 ## Component Breakdown
