@@ -10,9 +10,7 @@ The system is composed of several key packages that interact to translate a user
 
 ```mermaid
 graph TD
-    subgraph User
-        A[Frontend (Next.js)]
-    end
+    A[Frontend (Next.js)]
 
     subgraph Off-Chain Infrastructure
         B[Solver Service (Axum API)]
