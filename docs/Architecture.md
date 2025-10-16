@@ -1,113 +1,51 @@
-# Architecture Overview
+This is how the project is structured. The main idea is to keep things clean and separated so we can build without breaking stuff.
 
-This document outlines the architecture of the Solana Intent Execution Layer. The primary goal of this architecture is to create a system that is modular, testable, scalable, and easy for new contributors to understand.
+### The Basic Flow
 
-Our design philosophy is centered around a clear **separation of concerns**, distinguishing between the core business logic, the runtime environment, on-chain contracts, and the user-facing interfaces.
+It's pretty simple. The user's intent goes from the frontend to the backend, which figures out the best way to make it happen on Solana.
 
-## High-Level Diagram
-
-The system is composed of several key packages that interact to translate a user's *intent* into an executed Solana transaction.
-
-```mermaid
-graph TD
-    A[Frontend (Next.js)]
-
-    subgraph Off-Chain Infrastructure
-        B[Solver Service (Axum API)]
-        C[Solver Core (Rust Library)]
-    end
-
-    subgraph Solana Network
-        D[RPC Node]
-        E[On-Chain Programs (e.g., Jupiter, Raydium)]
-    end
-
-    A -- "1. User submits intent (JSON)" --> B
-    B -- "2. Validates & passes intent" --> C
-    C -- "3. Queries state & prices" --> D
-    C -- "4. Simulates execution paths" --> D
-    C -- "5. Returns optimal solution (Transaction)" --> B
-    B -- "6. Signs & sends transaction" --> D
-    D -- "7. Relays to network" --> E
-
-    style A fill:#cde4ff
-    style B fill:#d2ffd2
-    style C fill:#f2d2ff
-    style E fill:#ffcdd2
+```
+User's Intent (Frontend)
+      |
+      v
+API Endpoint (Solver Service)
+      |
+      v
+The Actual Logic (Solver Core)
+      |
+      v
+Solana Network
 ```
 
-## Component Breakdown
+### The Pieces
 
-The project is structured as a monorepo containing several distinct packages, each with a specific responsibility.
+The project lives in a monorepo under the `packages/` directory.
 
-### `packages/solver-core`
-This is the **brain** of the entire system.
+-   **`packages/solver-core` - The Brain.**
+    This is a Rust library (`lib.rs`). It contains all the real logic for figuring out intents. It knows nothing about web servers or anything else, which makes it easy to test.
 
--   **Type:** Rust library crate (`lib.rs`).
--   **Responsibilities:**
-    -   Defining core data structures: `Intent`, `Solution`, `ExecutionPath`.
-    -   Containing all business logic for resolving intents. This includes algorithms for finding the best swap routes, calculating arbitrage opportunities, and simulating transaction outcomes.
-    -   Interacting with the Solana RPC to fetch on-chain data (e.g., account states, oracle prices, liquidity pool reserves).
-    -   Constructing the final, optimized Solana transaction(s) required to fulfill the intent.
--   **Key Principle:** This crate knows *what* to do, but not *how* it is run. It has no concept of a web server or a command line. This makes it highly portable and easy to unit-test.
+-   **`packages/solver-service` - The Server.**
+    A lightweight Rust binary (`main.rs`) that runs the `solver-core`. It starts an Axum web server, exposes API endpoints like `/health`, and handles web requests. That's it.
 
-### `packages/solver-service`
-This is the **runtime engine** that exposes the `solver-core`'s logic to the outside world.
+-   **`packages/frontend` - The UI.**
+    A Next.js app where users connect their wallet and tell us what they want to do. It talks to the `solver-service` API.
 
--   **Type:** Rust binary crate (`main.rs`).
--   **Dependencies:** It depends directly on `solver-core`.
--   **Responsibilities:**
-    -   Setting up and running a web server (using Axum).
-    -   Defining API endpoints (e.g., `GET /health`, `POST /solve`).
-    -   Handling HTTP requests and responses: deserializing incoming intents from JSON, calling the appropriate functions in `solver-core`, and serializing the solution back into a JSON response.
-    -   Managing its runtime environment, including configuration and logging.
+-   **`packages/programs` - On-Chain Stuff.**
+    For any Anchor programs we might need later (like a vault for holding funds). For now, it's a placeholder.
 
-### `packages/frontend` (Planned)
-This is the **face** of the project, where users will interact with the system.
+### Why It's Set Up This Way
 
--   **Type:** Next.js application (TypeScript).
--   **Responsibilities:**
-    -   Providing a user-friendly interface for creating intents (e.g., a simple swap form).
-    -   Integrating with Solana wallets via the **Wallet Adapter** library for user authentication and transaction signing (if required).
-    -   Communicating with the `solver-service` via its REST API to submit intents and receive updates.
+We're following a couple of key patterns.
 
-### `packages/programs` (Planned)
-This directory will contain all on-chain Solana programs written with the Anchor framework.
+1.  **Workspace:** Everything is in a Cargo workspace defined by the root `Cargo.toml`. This keeps dependencies sane and lets you build/test everything at once from the root with `cargo build --workspace`.
 
--   **Type:** Anchor Rust crates.
--   **Responsibilities:**
-    -   While the solver's logic is off-chain, we may need on-chain programs for specific tasks that require atomicity or trustlessness.
-    -   Examples:
-        -   A "bento box" style vault program to hold user funds and allow the solver to execute trades on their behalf without needing the user to sign every transaction.
-        -   A multi-instruction dispatcher program that can atomically execute a complex series of CPIs composed by the solver.
+2.  **Core vs. Service:** The `solver-core` library is where the thinking happens. The `solver-service` just runs it. **This is the most important pattern here.** It means we can write simple unit tests for the hard parts without needing to spin up a server.
 
-## Architectural Patterns & Principles
+3.  **Off-Chain First:** All the heavy lifting (finding the best route, simulations, etc.) happens off-chain in our Rust code. On-chain programs should be simple and just execute what they're told.
 
-1.  **Workspace Monorepo:** The entire project is managed as a Cargo workspace. This ensures unified dependency management (`Cargo.lock`), simplified cross-crate development, and streamlined CI processes. All Rust components can be built and tested with a single command (`cargo build --workspace`).
+### Tech Stack
 
-2.  **Core / Binary Separation:** We strictly follow the pattern of separating our core logic (`solver-core`) from the binary that runs it (`solver-service`). This is the most critical architectural decision, providing:
-    -   **Testability:** Core algorithms can be unit-tested without needing to mock HTTP requests or a running server.
-    -   **Reusability:** The `solver-core` library could be used by other binaries in the future (e.g., a command-line tool, a different type of service) without any changes.
-    -   **Clarity:** The `solver-service` crate is lightweight and only concerned with server logic, making it easy to manage.
-
-3.  **Off-Chain Computation:** The heavy lifting of "solving" an intent is done off-chain. This is by design. On-chain programs are expensive, slow, and not suited for complex computations, simulations, or external data fetching. Our on-chain programs will only be used for validation and final atomic execution.
-
-## Technology Stack
-
--   **Backend:**
-    -   **Language:** Rust (Stable toolchain)
-    -   **Web Framework:** Axum
-    -   **Async Runtime:** Tokio
-    -   **Solana Interaction:** `solana-client`, `solana-sdk`
--   **Frontend:**
-    -   **Framework:** Next.js
-    -   **Language:** TypeScript
-    -   **Wallet Integration:** `@solana/wallet-adapter`
-    -   **UI:** Tailwind CSS, shadcn/ui
--   **On-Chain:**
-    -   **Framework:** Anchor
-    -   **Language:** Rust
--   **CI/CD:**
-    -   **Platform:** GitHub Actions
--   **Documentation:**
-    -   **Framework:** Docusaurus
+-   **Backend:** Rust, Axum, Tokio
+-   **Frontend:** Next.js, TypeScript, Tailwind CSS, Solana Wallet Adapter
+-   **On-Chain:** Anchor (Rust)
+-   **CI/CD:** GitHub Actions
