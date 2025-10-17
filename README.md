@@ -1,46 +1,78 @@
 # Solana Intents
 
-An intent-centric execution layer for Solana. This repo currently includes a minimal Rust solver crate and CI to build/test it. More packages (frontend, services, on-chain) will be added incrementally.
+An intent-centric execution layer for Solana. Less instructing, more achieving.
 
-## Repo layout
-- `packages/solver`: Rust solver (binary) — builds and runs
-- `packages/frontend`: placeholder for Next.js app
-- `packages/services`: placeholder for FastAPI/ML service
-- `.github/workflows/ci.yml`: minimal CI for solver build/test
+## What's This All About?
 
-## Quickstart (local)
-1. Open a terminal in the repo root.
-2. Build the solver:
-   ```bash
-   cd solana-intents/packages/solver
-   cargo build
-   ```
-3. Run the solver:
-   ```bash
-   cargo run
-   ```
-4. Run tests:
-   ```bash
-   cargo test
-   ```
+Instead of telling the blockchain *how* to do something, users just state their goal (their "intent"). Our system then figures out the best way to make it happen.
 
-You should see a startup message and a dummy priority fee printed. Tests validate the basic async flow.
+> **User:** "I want to swap 1 SOL for the most USDC I can get."
+>
+> **System:** *Finds the best route across multiple DEXs, builds the optimal transaction, and executes it.*
 
-## Next steps
-- Frontend: wallet connect + basic intent form (Jupiter swap)
-- Solver: add HTTP API (Axum) and Solana RPC/Jito fee polling
-- Services: data collection API and simple heuristic endpoint
+Want the full breakdown of the vision, who this is for, and how it will all work?
+**Check out the vision doc: [`docs/About.md`](docs/About.md)**
 
-## Contributions: 
-- open an issue first (select relevant tags), or select from the one already available and get assigned before sending the PR 
-- create a PR against `main` with branch name `feature/your-feature-name`. Keep changes scoped and add tests where feasible.
-- in PR, in 3 bullet points explain the changes, write `fixes #<issue-number>` on the top of PR message and send the merge request.
-- always keep your local fork up to date with the original one before sending PR.
-**Commands**:
-```bash
- git remote add upstream https://github.com/zendrix396/intents
- git remote -v
- git fetch upstream
- git merge upstream/main
- git push -u origin feature/<your-feature>
-```
+---
+
+## Getting Started
+
+You'll need the latest stable Rust and Node.js.
+
+1.  **Clone the repo:**
+    ```bash
+    git clone https://github.com/zendrix396/solana-intents.git
+    cd solana-intents
+    ```
+
+2.  **Build the workspace:**
+    This compiles all the Rust packages (`solver-core` and `solver-service`).
+    ```bash
+    cargo build --workspace
+    ```
+
+3.  **Run the tests:**
+    Make sure everything is working before you start.
+    ```bash
+    cargo test --workspace
+    ```
+
+4.  **Run the solver service:**
+    This starts the backend API server.
+    ```bash
+    cargo run -p solver-service
+    ```
+    You'll see the server start up on `http://0.0.0.0:3000`.
+
+---
+
+## Repo Layout
+
+The project is a monorepo containing a few key packages:
+
+-   `packages/solver-core`: The brain. A Rust library with all the core intent-solving logic.
+-   `packages/solver-service`: The server. A lightweight Rust binary that runs `solver-core` and exposes it via an Axum web server.
+-   `packages/frontend`: The face. A Next.js app for the UI. (WIP)
+-   `docs/`: All project documentation.
+
+For a deeper dive into the "why" behind this structure, see [`docs/Architecture.md`](docs/Architecture.md).
+
+---
+
+## Want to Contribute?
+
+Cool. We'd love the help. The basic flow is to find an issue, get assigned, and create a PR.
+
+All the specific details on our branching strategy, how to format your PRs, and how to keep your fork in sync are in our contribution guide.
+
+**Please read it here: [`CONTRIBUTING.md`](CONTRIBUTING.md)**
+
+---
+
+## Documentation
+
+All our documentation lives in the `/docs` folder and will eventually be available on our GitHub Pages site.
+
+-   **[About the Project](docs/About.md):** What this is and where it's going.
+-   **[Architecture Deep Dive](docs/Architecture.md):** How the pieces fit together.
+-   **[Contribution Guide](CONTRIBUTING.md):** How to help out.
