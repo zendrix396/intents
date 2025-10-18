@@ -12,21 +12,25 @@ use solver_core::rpc_manager::{ConnectionManager, RpcHealth};
 use solver_core::{solve_swap_intent, SwapIntent, SwapSolution};
 use std::sync::Arc;
 
+mod payer_manager;
+use payer_manager::PayerManager;
+
 #[derive(Clone)]
 struct AppState {
     connection_manager: Arc<ConnectionManager>,
     fee_estimator: Arc<FeeEstimator>,
+    payer_manager: Arc<PayerManager>,
 }
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+
     println!("Starting Solana Intent Solver Service...");
 
-    // For now, we'll hardcode some RPC URLs. Later, this will come from a config file.
     let rpc_urls = vec![
+        "https://api.devnet.solana.com".to_string(),
         "https://api.mainnet-beta.solana.com".to_string(),
-        "https://solana-api.projectserum.com".to_string(), // A common fallback
-        "https://bad-rpc-url.example.com".to_string(),     // A fake one to test failover
     ];
 
     let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
@@ -35,9 +39,13 @@ async fn main() {
     let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
     fee_estimator.start_fee_monitor();
 
+    let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
+    payer_manager.start_balance_monitor();
+
     let app_state = AppState {
         connection_manager,
         fee_estimator,
+        payer_manager,
     };
 
     // Create the router and pass the state to it.
@@ -69,12 +77,14 @@ async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>
     #[derive(Serialize)]
     struct HealthResponse {
         status: &'static str,
+        payer_wallet: String,
         rpc_endpoints: Vec<RpcHealth>,
         priority_fees: Value,
     }
 
     let response = HealthResponse {
         status: "ok",
+        payer_wallet: state.payer_manager.public_key().to_string(),
         rpc_endpoints: rpc_health,
         priority_fees: json!({
             "low": low_fee,
@@ -101,17 +111,25 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
+    use solana_sdk::signature::Signer;
     use tower::ServiceExt;
 
     #[tokio::test]
     async fn test_health_check() {
+        let mock_keypair = solana_sdk::signature::Keypair::new();
+        let expected_pubkey = mock_keypair.pubkey().to_string();
+        std::env::remove_var("SEED_PHRASE");
+        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
+
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
+        let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
 
         let test_state = AppState {
             connection_manager,
             fee_estimator,
+            payer_manager,
         };
 
         let app = app(test_state);
@@ -131,6 +149,7 @@ mod tests {
         let body: Value = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(body["status"], "ok");
+        assert_eq!(body["payer_wallet"], expected_pubkey);
         assert!(body["rpc_endpoints"].is_array());
         assert!(body["priority_fees"].is_object());
         assert!(body["priority_fees"]["medium"].is_number());
@@ -138,13 +157,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_solve_endpoint() {
+        let mock_keypair = solana_sdk::signature::Keypair::new();
+        std::env::remove_var("SEED_PHRASE");
+        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
+
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
+        let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
 
         let test_state = AppState {
             connection_manager,
             fee_estimator,
+            payer_manager,
         };
 
         let app = app(test_state);
