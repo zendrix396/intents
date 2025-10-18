@@ -23,10 +23,7 @@ pub struct ConnectionManager {
 impl ConnectionManager {
     /// Creates a new ConnectionManager from a list of RPC URLs.
     pub fn new(rpc_urls: Vec<String>) -> Self {
-        let clients: Vec<RpcClient> = rpc_urls
-            .into_iter()
-            .map(|url| RpcClient::new(url))
-            .collect();
+        let clients: Vec<RpcClient> = rpc_urls.into_iter().map(RpcClient::new).collect();
 
         let health = Arc::new(Mutex::new(vec![true; clients.len()]));
 

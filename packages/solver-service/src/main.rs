@@ -10,7 +10,6 @@ use serde_json::{json, Value};
 use solver_core::rpc_manager::{ConnectionManager, RpcHealth};
 use solver_core::{solve_swap_intent, SwapIntent, SwapSolution};
 use std::sync::Arc;
-use tokio;
 
 // Define a struct to hold the shared application state.
 // We use Arc to safely share the ConnectionManager across async tasks.
@@ -112,7 +111,7 @@ mod tests {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        
+
         let body: Value = serde_json::from_slice(&body).unwrap();
 
         // Check for the new response structure.

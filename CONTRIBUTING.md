@@ -32,7 +32,7 @@ The project is a Cargo workspace. The important parts are in `packages/`:
 1.  **Grab an issue:** Find an open issue and get assigned to it. Or, open a new one to discuss your idea first.
 2.  **Create a branch:** Name it something like `feature/add-swap-logic`.
 3.  **Write your code.** Keep the changes focused on the issue you're solving.
-4.  **Format your code:** Before you commit, run `cargo fmt` from the root. Our CI will fail if you don't.
+4.  **Format your code:** Before you commit, run `cargo fmt` and `cargo clippy` from the root. Our CI will fail if you don't.
 5.  **Make sure tests pass:** `cargo test --workspace`.
 6.  **Open a PR:**
     -   Keep the description short and sweet.
