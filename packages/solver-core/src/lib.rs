@@ -1,9 +1,5 @@
-// Add this line to make the rpc_manager module public
+pub mod fee_estimator;
 pub mod rpc_manager;
-
-pub async fn fetch_priority_fees() -> Result<u64, ()> {
-    Ok(100_000)
-}
 
 use serde::{Deserialize, Serialize};
 
@@ -32,13 +28,6 @@ pub async fn solve_swap_intent(intent: SwapIntent) -> SwapSolution {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_fetch_priority_fees_mock() {
-        let fee = fetch_priority_fees().await;
-        assert!(fee.is_ok());
-        assert_eq!(fee.unwrap(), 100_000);
-    }
 
     #[tokio::test]
     async fn test_solve_swap_intent_mock() {
