@@ -1,3 +1,6 @@
+// Add this line to make the rpc_manager module public
+pub mod rpc_manager;
+
 pub async fn fetch_priority_fees() -> Result<u64, ()> {
     Ok(100_000)
 }
