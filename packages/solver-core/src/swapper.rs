@@ -1,41 +1,45 @@
 use serde::{Deserialize, Serialize};
 
-/// User's intent to perform a swap
+/// Represents the user's intent, now including the taker address.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SwapIntent {
     pub input_mint: String,
     pub output_mint: String,
     pub amount: u64,
-    pub slippage_bps: u16,
+    pub taker: String, // This is the new required field
 }
 
-/// Response from Jupiter Quote API
+/// Represents the response from the Jupiter /ultra/v1/order API.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct JupiterQuoteResponse {
-    pub input_mint: String,
+pub struct JupiterOrderResponse {
     pub in_amount: String,
-    pub output_mint: String,
     pub out_amount: String,
-    pub route_plan: serde_json::Value,
+    // The `transaction` field might be null if there's an error, so we make it optional.
+    #[serde(default)]
+    pub transaction: Option<String>,
+    #[serde(default)]
+    pub error_message: Option<String>,
 }
 
-/// Solve a swap intent using Jupiter
+/// Solves a swap intent using Jupiter's Ultra Order API.
 pub async fn solve_swap_intent_with_jupiter(
     intent: &SwapIntent,
-) -> Result<JupiterQuoteResponse, reqwest::Error> {
+) -> Result<JupiterOrderResponse, reqwest::Error> {
+    // 1. Build the correct URL for the Ultra Order API.
     let url = format!(
-        "https://quote-api.jup.ag/v6/quote?inputMint={}&outputMint={}&amount={}&slippageBps={}",
-        intent.input_mint, intent.output_mint, intent.amount, intent.slippage_bps
+        "https://lite-api.jup.ag/ultra/v1/order?inputMint={}&outputMint={}&amount={}&taker={}",
+        intent.input_mint, intent.output_mint, intent.amount, intent.taker
     );
 
-    println!("[Solver] Calling Jupiter API: {url}");
+    println!("[Solver] Calling Jupiter Ultra API: {}", url);
 
     let client = reqwest::Client::new();
     let response = client.get(&url).send().await?;
 
-    let quote_response = response.json::<JupiterQuoteResponse>().await?;
+    // Parse the response - the API returns 200 OK even with error messages in the JSON
+    let order_response = response.json::<JupiterOrderResponse>().await?;
 
-    Ok(quote_response)
+    Ok(order_response)
 }
