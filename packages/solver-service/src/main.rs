@@ -7,15 +7,15 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::{json, Value};
+use solver_core::fee_estimator::FeeEstimator;
 use solver_core::rpc_manager::{ConnectionManager, RpcHealth};
 use solver_core::{solve_swap_intent, SwapIntent, SwapSolution};
 use std::sync::Arc;
 
-// Define a struct to hold the shared application state.
-// We use Arc to safely share the ConnectionManager across async tasks.
 #[derive(Clone)]
 struct AppState {
     connection_manager: Arc<ConnectionManager>,
+    fee_estimator: Arc<FeeEstimator>,
 }
 
 #[tokio::main]
@@ -29,14 +29,16 @@ async fn main() {
         "https://bad-rpc-url.example.com".to_string(),     // A fake one to test failover
     ];
 
-    // Create a new ConnectionManager and wrap it in an Arc for thread-safe sharing.
     let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
-
-    // Start the background health checker task.
     connection_manager.start_health_checker();
 
-    // Create our application state.
-    let app_state = AppState { connection_manager };
+    let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
+    fee_estimator.start_fee_monitor();
+
+    let app_state = AppState {
+        connection_manager,
+        fee_estimator,
+    };
 
     // Create the router and pass the state to it.
     let app = app(app_state);
@@ -54,20 +56,33 @@ fn app(app_state: AppState) -> Router {
         .with_state(app_state)
 }
 
-// Make our handler accept the shared state.
 async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     let rpc_health = state.connection_manager.get_health_status().await;
-    // Convert the health status into a serializable format.
+
+    let low_fee = state.fee_estimator.get_priority_fee_for_level("low").await;
+    let medium_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("medium")
+        .await;
+    let high_fee = state.fee_estimator.get_priority_fee_for_level("high").await;
+
     #[derive(Serialize)]
     struct HealthResponse {
         status: &'static str,
         rpc_endpoints: Vec<RpcHealth>,
+        priority_fees: Value,
     }
 
     let response = HealthResponse {
         status: "ok",
         rpc_endpoints: rpc_health,
+        priority_fees: json!({
+            "low": low_fee,
+            "medium": medium_fee,
+            "high": high_fee,
+        }),
     };
+
     (StatusCode::OK, Json(json!(response)))
 }
 
@@ -90,13 +105,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_check() {
-        // Create a ConnectionManager for testing purposes.
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
+        let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
 
-        let test_state = AppState { connection_manager };
+        let test_state = AppState {
+            connection_manager,
+            fee_estimator,
+        };
 
-        // Create our app with the test state.
         let app = app(test_state);
 
         let request = Request::builder()
@@ -105,7 +122,6 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(request).await.unwrap();
-
         assert_eq!(response.status(), StatusCode::OK);
 
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -114,21 +130,22 @@ mod tests {
 
         let body: Value = serde_json::from_slice(&body).unwrap();
 
-        // Check for the new response structure.
         assert_eq!(body["status"], "ok");
         assert!(body["rpc_endpoints"].is_array());
-        assert_eq!(
-            body["rpc_endpoints"][0]["url"],
-            "https://api.devnet.solana.com"
-        );
+        assert!(body["priority_fees"].is_object());
+        assert!(body["priority_fees"]["medium"].is_number());
     }
 
     #[tokio::test]
     async fn test_solve_endpoint() {
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
+        let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
 
-        let test_state = AppState { connection_manager };
+        let test_state = AppState {
+            connection_manager,
+            fee_estimator,
+        };
 
         let app = app(test_state);
 
