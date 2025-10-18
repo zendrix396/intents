@@ -116,14 +116,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_check() {
-        let mock_keypair = solana_sdk::signature::Keypair::new();
-        let expected_pubkey = mock_keypair.pubkey().to_string();
         std::env::remove_var("SEED_PHRASE");
-      
+        let mock_keypair = solana_sdk::signature::Keypair::new();
+        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
+
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
         let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
+        
+        let expected_pubkey = payer_manager.public_key().to_string();
 
         let test_state = AppState {
             connection_manager,
@@ -157,6 +159,7 @@ mod tests {
     #[tokio::test]
     async fn test_solve_endpoint() {
         let mock_keypair = solana_sdk::signature::Keypair::new();
+        let _expected_pubkey = mock_keypair.pubkey().to_string();
         std::env::remove_var("SEED_PHRASE");
 
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];

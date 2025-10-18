@@ -1,6 +1,6 @@
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{Keypair, SeedDerivable, Signer},
 };
 use solver_core::rpc_manager::ConnectionManager;
 use std::env;
@@ -21,7 +21,7 @@ impl PayerManager {
             let mnemonic = bip39::Mnemonic::parse(&seed_phrase)
                 .expect("FATAL: Invalid SEED_PHRASE. Must be valid BIP39 mnemonic.");
             let seed = mnemonic.to_seed("");
-            Keypair::from_bytes(&seed[..32])
+            Keypair::from_seed(&seed[..32])
                 .expect("FATAL: Failed to create keypair from seed phrase.")
         } else if let Ok(private_key_b58) = env::var("PRIVATE_KEY") {
             // Load from base58 private key
