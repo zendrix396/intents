@@ -58,7 +58,6 @@ fn app(app_state: AppState) -> Router {
 // Make our handler accept the shared state.
 async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     let rpc_health = state.connection_manager.get_health_status().await;
-
     // Convert the health status into a serializable format.
     #[derive(Serialize)]
     struct HealthResponse {
@@ -70,7 +69,6 @@ async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>
         status: "ok",
         rpc_endpoints: rpc_health,
     };
-
     (StatusCode::OK, Json(json!(response)))
 }
 
@@ -114,7 +112,7 @@ mod tests {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-
+        
         let body: Value = serde_json::from_slice(&body).unwrap();
 
         // Check for the new response structure.
