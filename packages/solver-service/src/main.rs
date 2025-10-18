@@ -119,8 +119,7 @@ mod tests {
         let mock_keypair = solana_sdk::signature::Keypair::new();
         let expected_pubkey = mock_keypair.pubkey().to_string();
         std::env::remove_var("SEED_PHRASE");
-        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
-
+      
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
@@ -159,7 +158,6 @@ mod tests {
     async fn test_solve_endpoint() {
         let mock_keypair = solana_sdk::signature::Keypair::new();
         std::env::remove_var("SEED_PHRASE");
-        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
 
         let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
