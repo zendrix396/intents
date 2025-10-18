@@ -16,6 +16,8 @@ solver-core = { path = "../solver-core" }
 # Solana SDK for wallet management
 solana-sdk = "1.18.14"
 dotenvy = "0.15"
+bip39 = "2.0"
+
 
 [dev-dependencies]
 tower = "0.5"

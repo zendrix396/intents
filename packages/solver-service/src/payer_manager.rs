@@ -1,6 +1,6 @@
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{Keypair, SeedDerivable, Signer},
 };
 use solver_core::rpc_manager::ConnectionManager;
 use std::env;
@@ -13,12 +13,22 @@ pub struct PayerManager {
 }
 
 impl PayerManager {
-    /// Creates a new PayerManager by loading a private key from the environment.
+    /// Creates a new PayerManager by loading a keypair from the environment.
+    /// Supports either SEED_PHRASE or PRIVATE_KEY env vars.
     pub fn from_env(connection_manager: Arc<ConnectionManager>) -> Self {
-        let private_key_b58 =
-            env::var("PRIVATE_KEY").expect("FATAL: PRIVATE_KEY environment variable not set.");
-
-        let keypair = Keypair::from_base58_string(&private_key_b58);
+        let keypair = if let Ok(seed_phrase) = env::var("SEED_PHRASE") {
+            // Load from seed phrase
+            let mnemonic = bip39::Mnemonic::parse(&seed_phrase)
+                .expect("FATAL: Invalid SEED_PHRASE. Must be valid BIP39 mnemonic.");
+            let seed = mnemonic.to_seed("");
+            Keypair::from_seed(&seed[..32])
+                .expect("FATAL: Failed to create keypair from seed phrase.")
+        } else if let Ok(private_key_b58) = env::var("PRIVATE_KEY") {
+            // Load from base58 private key
+            Keypair::from_base58_string(&private_key_b58)
+        } else {
+            panic!("FATAL: Either SEED_PHRASE or PRIVATE_KEY environment variable must be set.");
+        };
 
         println!("[Payer Manager] Loaded payer wallet: {}", keypair.pubkey());
 
