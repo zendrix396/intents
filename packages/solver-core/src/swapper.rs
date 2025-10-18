@@ -40,4 +40,3 @@ pub async fn solve_swap_intent_with_jupiter(
 
     Ok(order_response)
 }
-

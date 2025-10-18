@@ -108,7 +108,7 @@ async fn solve_handler(
     match solve_swap_intent_with_jupiter(&intent).await {
         Ok(order) => Ok(Json(order)),
         Err(e) => {
-            eprintln!("[API] Error solving intent: {e}");
+            println!("[API] Error solving intent: {e}");
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to get order from Jupiter: {e}"),
