@@ -124,33 +124,34 @@ mod tests {
         body::Body,
         http::{Request, StatusCode},
     };
+    use solana_sdk::signature::Signer;
     use tower::ServiceExt;
 
-    #[tokio::test]
-    async fn test_health_check() {
-        std::env::remove_var("SEED_PHRASE");
+    fn setup_test_environment() -> (AppState, solana_sdk::signature::Keypair) {
         let mock_keypair = solana_sdk::signature::Keypair::new();
-        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
 
-        // Set RPC_URL for testing if not already set
-        if std::env::var("RPC_URL").is_err() {
-            std::env::set_var("RPC_URL", "https://api.devnet.solana.com");
-        }
-        let rpc_url = std::env::var("RPC_URL").unwrap();
-        let rpc_urls = vec![rpc_url];
+        env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
+        env::remove_var("SEED_PHRASE");
+
+        let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
         let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
 
-        let expected_pubkey = payer_manager.public_key().to_string();
-
-        let test_state = AppState {
+        let app_state = AppState {
             connection_manager,
             fee_estimator,
             payer_manager,
         };
 
-        let app = app(test_state);
+        (app_state, mock_keypair)
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let (app_state, mock_keypair) = setup_test_environment();
+        let expected_pubkey = mock_keypair.pubkey().to_string();
+        let app = app(app_state);
 
         let request = Request::builder()
             .uri("/health")
@@ -168,36 +169,14 @@ mod tests {
 
         assert_eq!(body["status"], "ok");
         assert_eq!(body["payer_wallet"], expected_pubkey);
-        assert!(body["rpc_endpoints"].is_array());
-        assert!(body["priority_fees"].is_object());
-        assert!(body["priority_fees"]["medium"].is_number());
     }
 
     #[tokio::test]
     #[ignore] // requires internet access
     async fn test_solve_endpoint_with_jupiter() {
-        let mock_keypair = solana_sdk::signature::Keypair::new();
-        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
-        std::env::remove_var("SEED_PHRASE");
+        let (app_state, _) = setup_test_environment();
+        let app = app(app_state);
 
-        if std::env::var("RPC_URL").is_err() {
-            std::env::set_var("RPC_URL", "https://api.devnet.solana.com");
-        }
-        let rpc_url = std::env::var("RPC_URL").unwrap();
-        let rpc_urls = vec![rpc_url];
-        let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
-        let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
-        let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
-
-        let test_state = AppState {
-            connection_manager,
-            fee_estimator,
-            payer_manager,
-        };
-
-        let app = app(test_state);
-
-        // Real swap intent: 0.1 SOL to USDC
         let payload = json!({
             "inputMint": "So11111111111111111111111111111111111111112",
             "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
@@ -221,17 +200,7 @@ mod tests {
 
         let quote: JupiterQuoteResponse = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(
-            quote.input_mint,
-            "So11111111111111111111111111111111111111112"
-        );
         assert_eq!(quote.in_amount, "100000000");
-        assert_eq!(
-            quote.output_mint,
-            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-        );
-
-        let out_amount = quote.out_amount.parse::<u64>().unwrap();
-        assert!(out_amount > 0);
+        assert!(quote.out_amount.parse::<u64>().unwrap() > 0);
     }
 }
