@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 use solver_core::fee_estimator::FeeEstimator;
 use solver_core::rpc_manager::{ConnectionManager, RpcHealth};
 use solver_core::{solve_swap_intent, SwapIntent, SwapSolution};
+use std::env;
 use std::sync::Arc;
 
 mod payer_manager;
@@ -28,10 +29,13 @@ async fn main() {
 
     println!("Starting Solana Intent Solver Service...");
 
-    let rpc_urls = vec![
-        "https://api.devnet.solana.com".to_string(),
-        "https://api.mainnet-beta.solana.com".to_string(),
-    ];
+    // Read the RPC URL from the .env file. Panic if it's not set.
+    let rpc_url = env::var("RPC_URL")
+        .expect("FATAL: RPC_URL environment variable not set.");
+
+    // The rpc_urls vector now contains only the URL from your config.
+    let rpc_urls = vec![rpc_url];
+    println!("[RPC Manager] Using endpoint: {}", rpc_urls[0]);
 
     let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
     connection_manager.start_health_checker();
@@ -116,14 +120,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_check() {
+        std::env::remove_var("SEED_PHRASE");
         let mock_keypair = solana_sdk::signature::Keypair::new();
-        let expected_pubkey = mock_keypair.pubkey().to_string();
         std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
 
-        let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
+        // Set RPC_URL for testing if not already set
+        if std::env::var("RPC_URL").is_err() {
+            std::env::set_var("RPC_URL", "https://api.devnet.solana.com");
+        }
+        let rpc_url = std::env::var("RPC_URL").unwrap();
+        let rpc_urls = vec![rpc_url];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
         let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
+        
+        let expected_pubkey = payer_manager.public_key().to_string();
 
         let test_state = AppState {
             connection_manager,
@@ -157,9 +168,15 @@ mod tests {
     #[tokio::test]
     async fn test_solve_endpoint() {
         let mock_keypair = solana_sdk::signature::Keypair::new();
-        std::env::set_var("PRIVATE_KEY", mock_keypair.to_base58_string());
+        let _expected_pubkey = mock_keypair.pubkey().to_string();
+        std::env::remove_var("SEED_PHRASE");
 
-        let rpc_urls = vec!["https://api.devnet.solana.com".to_string()];
+        // Set RPC_URL for testing if not already set
+        if std::env::var("RPC_URL").is_err() {
+            std::env::set_var("RPC_URL", "https://api.devnet.solana.com");
+        }
+        let rpc_url = std::env::var("RPC_URL").unwrap();
+        let rpc_urls = vec![rpc_url];
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
         let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
