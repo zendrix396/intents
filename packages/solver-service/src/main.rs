@@ -17,6 +17,7 @@ use solver_core::{
 };
 use std::env;
 use std::sync::Arc;
+use base64::Engine; // for base64 decode Engine API
 
 mod payer_manager;
 use payer_manager::PayerManager;
@@ -77,6 +78,7 @@ fn app(app_state: AppState) -> Router {
         .route("/solve", post(solve_handler))
         // Add a new route to test the executor
         .route("/test_execute", post(test_execute_handler))
+        .route("/execute", post(execute_handler))
         .with_state(app_state)
 }
 
@@ -172,6 +174,65 @@ async fn test_execute_handler(
     // 5. Pass the now-signed transaction to the executor to send and confirm.
     match state.executor.execute_transaction(&tx).await {
         Ok(signature) => Ok(Json(json!({ "signature": signature.to_string() }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Execution failed: {}", e),
+        )),
+    }
+}
+
+async fn execute_handler(
+    State(state): State<AppState>,
+    Json(intent): Json<SwapIntent>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    println!("[API] Received /execute request for intent: {:?}", intent);
+
+    // 1) Get quote/order from Jupiter
+    let quote = solve_swap_intent_with_jupiter(&intent).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to get quote: {}", e),
+        )
+    })?;
+
+    if let Some(err) = &quote.error_message {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("Jupiter returned error: {}", err),
+        ));
+    }
+
+    println!("[API] Step 1/3: Got quote successfully.");
+
+    // 2) Extract the transaction string returned by Jupiter (if present)
+    let tx_b64 = quote.transaction.as_ref().ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "Quote did not include a transaction".to_string(),
+        )
+    })?;
+
+    // 3) Decode and deserialize the VersionedTransaction
+    let tx_bytes = base64::engine::general_purpose::STANDARD.decode(tx_b64).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to decode transaction: {}", e),
+        )
+    })?;
+
+    let tx: VersionedTransaction = bincode::deserialize(&tx_bytes).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to deserialize transaction: {}", e),
+        )
+    })?;
+
+    // 4) Execute it
+    match state.executor.execute_transaction(&tx).await {
+        Ok(signature) => {
+            println!("[API] Step 3/3: Execution successful!");
+            Ok(Json(json!({ "signature": signature.to_string() })))
+        }
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Execution failed: {}", e),
