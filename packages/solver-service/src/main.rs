@@ -7,9 +7,14 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::{json, Value};
-use solver_core::fee_estimator::FeeEstimator;
-use solver_core::rpc_manager::{ConnectionManager, RpcHealth};
-use solver_core::{solve_swap_intent_with_jupiter, JupiterOrderResponse, SwapIntent};
+use solana_sdk::signature::Signer;
+use solana_sdk::{message::Message, system_instruction, transaction::VersionedTransaction};
+use solver_core::{
+    executor::TransactionExecutor,
+    fee_estimator::FeeEstimator,
+    rpc_manager::{ConnectionManager, RpcHealth},
+    solve_swap_intent_with_jupiter, JupiterOrderResponse, SwapIntent,
+};
 use std::env;
 use std::sync::Arc;
 
@@ -21,6 +26,7 @@ struct AppState {
     connection_manager: Arc<ConnectionManager>,
     fee_estimator: Arc<FeeEstimator>,
     payer_manager: Arc<PayerManager>,
+    executor: Arc<TransactionExecutor>, // New field
 }
 
 #[tokio::main]
@@ -45,10 +51,15 @@ async fn main() {
     let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
     payer_manager.start_balance_monitor();
 
+    // Create a new TransactionExecutor instance
+    let executor = Arc::new(TransactionExecutor::new(connection_manager.clone()));
+
+    // Add it to our state
     let app_state = AppState {
         connection_manager,
         fee_estimator,
         payer_manager,
+        executor, // Add it here
     };
 
     // Create the router and pass the state to it.
@@ -64,6 +75,8 @@ fn app(app_state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/solve", post(solve_handler))
+        // Add a new route to test the executor
+        .route("/test_execute", post(test_execute_handler))
         .with_state(app_state)
 }
 
@@ -117,6 +130,48 @@ async fn solve_handler(
     }
 }
 
+/// A simple handler to test our TransactionExecutor.
+/// It creates and executes a transaction that sends 0.001 SOL to itself.
+async fn test_execute_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    println!("[API] Received /test_execute request");
+    let payer = state.payer_manager.get_keypair();
+    let client = state.connection_manager.get_healthy_client().await;
+
+    // 1. Create a simple transfer instruction
+    let instruction = system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000); // 0.001 SOL
+
+    // 2. Get the latest blockhash
+    let blockhash = client.get_latest_blockhash().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to get blockhash: {}", e),
+        )
+    })?;
+
+    // 3. Build a versioned transaction
+    let tx = VersionedTransaction::try_new(
+        Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash),
+        &[payer], // The only signer is the payer
+    )
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to build transaction: {}", e),
+        )
+    })?;
+
+    // 4. Use our executor to send it
+    match state.executor.execute_transaction(tx, payer).await {
+        Ok(signature) => Ok(Json(json!({ "signature": signature.to_string() }))),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Execution failed: {}", e),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,6 +197,7 @@ mod tests {
             connection_manager,
             fee_estimator,
             payer_manager,
+            executor: Arc::new(TransactionExecutor::new(connection_manager.clone())),
         };
 
         (app_state, mock_keypair)
