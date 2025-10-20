@@ -32,37 +32,37 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-
     println!("Starting Solana Intent Solver Service...");
 
-    // Read the RPC URL from the .env file. Panic if it's not set.
     let rpc_url = env::var("RPC_URL").expect("FATAL: RPC_URL environment variable not set.");
-
-    // The rpc_urls vector now contains only the URL from your config.
     let rpc_urls = vec![rpc_url];
     println!("[RPC Manager] Using endpoint: {}", rpc_urls[0]);
 
+    // 1. Create the Arc for the ConnectionManager ONCE.
     let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
+    
+    // 2. Start the health checker on the original Arc.
     connection_manager.start_health_checker();
 
+    // 3. Create other components by CLONING the Arc.
+    //    Cloning an Arc is cheap; it just bumps a reference counter.
     let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
     fee_estimator.start_fee_monitor();
 
     let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
     payer_manager.start_balance_monitor();
-
-    // Create a new TransactionExecutor instance
+    
     let executor = Arc::new(TransactionExecutor::new(connection_manager.clone()));
 
-    // Add it to our state
+    // 4. NOW, create the AppState. This will MOVE the final ownership of the
+    //    original `connection_manager` Arc and the other Arcs into the state.
     let app_state = AppState {
-        connection_manager,
+        connection_manager, // The original is moved here.
         fee_estimator,
         payer_manager,
-        executor, // Add it here
+        executor,
     };
 
-    // Create the router and pass the state to it.
     let app = app(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -139,31 +139,38 @@ async fn test_execute_handler(
     let payer = state.payer_manager.get_keypair();
     let client = state.connection_manager.get_healthy_client().await;
 
-    // 1. Create a simple transfer instruction
-    let instruction = system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000); // 0.001 SOL
+    // 1. Create the instruction.
+    let instruction =
+        system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000); // 0.001 SOL
 
-    // 2. Get the latest blockhash
-    let blockhash = client.get_latest_blockhash().await.map_err(|e| {
+    // 2. Get a recent blockhash. This is required for signing.
+    let (blockhash, _) = client
+        .get_latest_blockhash_with_commitment(client.commitment())
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to get blockhash: {}", e),
+            )
+        })?;
+
+    // 3. Build the message with the blockhash.
+    let message = solana_sdk::message::VersionedMessage::Legacy(Message::new_with_blockhash(
+        &[instruction],
+        Some(&payer.pubkey()),
+        &blockhash,
+    ));
+
+    // 4. Create AND SIGN the transaction in a single step using try_new.
+    let tx = VersionedTransaction::try_new(message, &[payer]).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to get blockhash: {}", e),
+            format!("Failed to sign transaction: {}", e),
         )
-    })?;
+    })?; // The '?' handles the Result
 
-    // 3. Build a versioned transaction
-    let tx = VersionedTransaction::try_new(
-        Message::new_with_blockhash(&[instruction], Some(&payer.pubkey()), &blockhash),
-        &[payer], // The only signer is the payer
-    )
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to build transaction: {}", e),
-        )
-    })?;
-
-    // 4. Use our executor to send it
-    match state.executor.execute_transaction(tx, payer).await {
+    // 5. Pass the now-signed transaction to the executor to send and confirm.
+    match state.executor.execute_transaction(&tx).await {
         Ok(signature) => Ok(Json(json!({ "signature": signature.to_string() }))),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -181,6 +188,7 @@ mod tests {
     };
     use solana_sdk::signature::Signer;
     use tower::ServiceExt;
+    use std::env;
 
     fn setup_test_environment() -> (AppState, solana_sdk::signature::Keypair) {
         let mock_keypair = solana_sdk::signature::Keypair::new();
@@ -192,12 +200,13 @@ mod tests {
         let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
         let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
         let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
+        let executor = Arc::new(TransactionExecutor::new(connection_manager.clone()));
 
         let app_state = AppState {
             connection_manager,
             fee_estimator,
             payer_manager,
-            executor: Arc::new(TransactionExecutor::new(connection_manager.clone())),
+            executor,
         };
 
         (app_state, mock_keypair)
