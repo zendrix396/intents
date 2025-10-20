@@ -43,6 +43,12 @@ impl PayerManager {
         self.keypair.pubkey()
     }
 
+    /// Returns a reference to the keypair.
+    /// This is needed for signing transactions.
+    pub fn get_keypair(&self) -> &Keypair {
+        &self.keypair
+    }
+
     /// Spawns a background task to periodically check the payer's balance.
     pub fn start_balance_monitor(self: &Arc<Self>) {
         let self_clone = self.clone();

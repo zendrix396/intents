@@ -11,6 +11,9 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 
 # New dependencies for RPC and error handling
 solana-client = "1.18.14"
-solana-sdk = "1.18.14"
 thiserror = "1.0"
 futures = "0.3"
+
+# New dependencies for transaction handling
+solana-sdk = "1.18.14"
+solana-transaction-status = "1.18.14"
