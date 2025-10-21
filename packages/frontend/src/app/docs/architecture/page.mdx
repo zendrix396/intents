@@ -1,0 +1,196 @@
+import { Navbar } from "@/components/Navbar";
+import Link from "next/link";
+import { ClientPageWrapper } from "@/components/ClientPageWrapper";
+
+export default function ArchitecturePage() {
+  
+  return (
+    <ClientPageWrapper currentPage="/docs/architecture">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+        <Navbar />
+
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        {/* Breadcrumb Navigation */}
+        <nav className="mb-8">
+          <div className="flex items-center space-x-2 text-sm text-gray-400">
+            <Link href="/docs" prefetch={true} className="hover:text-white transition-colors">
+              Documentation
+            </Link>
+            <span>/</span>
+            <span className="text-white">Architecture</span>
+          </div>
+        </nav>
+
+        {/* Hero Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 mb-6">
+            <div className="w-2 h-2 rounded-full bg-blue-400 mr-3 animate-pulse" />
+            <span className="text-sm font-medium text-blue-300">System Architecture</span>
+          </div>
+
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-6">
+            Architecture
+          </h1>
+
+          <p className="text-xl text-gray-400 leading-relaxed max-w-3xl">
+            This is how the project is structured. The main idea is to keep things clean and separated so we can build without breaking stuff.
+          </p>
+        </div>
+
+        <article className="prose prose-invert prose-lg max-w-none prose-headings:text-white prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-300 prose-p:leading-relaxed prose-strong:text-white prose-code:text-blue-300 prose-code:bg-gray-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-blockquote:border-l-blue-500 prose-blockquote:bg-gray-800/50 prose-blockquote:border prose-blockquote:border-gray-700 prose-blockquote:rounded-r-lg prose-ul:text-gray-300 prose-ol:text-gray-300">
+          <h1>Architecture</h1>
+
+          <p>
+            This is how the project is structured. The main idea is to keep
+            things clean and separated so we can build without breaking stuff.
+          </p>
+
+          <h3>The Basic Flow</h3>
+
+          <p>
+            It's pretty simple. The user's intent goes from the frontend to the
+            backend, which figures out the best way to make it happen on Solana.
+          </p>
+
+          <pre>
+            <code>{`User's Intent (Frontend)
+      |
+      v
+
+API Endpoint (Solver Service)
+|
+v
+The Actual Logic (Solver Core)
+|
+v
+Solana Network`}</code>
+
+</pre>
+
+          <h3>The Pieces</h3>
+
+          <p>
+            The project lives in a monorepo under the <code>packages/</code>{" "}
+            directory.
+          </p>
+
+          <ul>
+            <li>
+              <strong>
+                <code>packages/solver-core</code> - The Brain.
+              </strong>
+              <br />
+              This is a Rust library (<code>lib.rs</code>). It contains all the
+              real logic for figuring out intents. It knows nothing about web
+              servers or anything else, which makes it easy to test.
+            </li>
+
+            <li>
+              <strong>
+                <code>packages/solver-service</code> - The Server.
+              </strong>
+              <br />A lightweight Rust binary (<code>main.rs</code>) that runs
+              the <code>solver-core</code>. It starts an Axum web server,
+              exposes API endpoints like <code>/health</code>, and handles web
+              requests. That's it.
+            </li>
+
+            <li>
+              <strong>
+                <code>packages/frontend</code> - The UI.
+              </strong>
+              <br />A Next.js app where users connect their wallet and tell us
+              what they want to do. It talks to the <code>solver-service</code>{" "}
+              API.
+            </li>
+
+            <li>
+              <strong>
+                <code>packages/programs</code> - On-Chain Stuff.
+              </strong>
+              <br />
+              For any Anchor programs we might need later (like a vault for
+              holding funds). For now, it's a placeholder.
+            </li>
+          </ul>
+
+          <h3>Why It's Set Up This Way</h3>
+
+          <p>We're following a couple of key patterns.</p>
+
+          <ol>
+            <li>
+              <strong>Workspace:</strong> Everything is in a Cargo workspace
+              defined by the root <code>Cargo.toml</code>. This keeps
+              dependencies sane and lets you build/test everything at once from
+              the root with <code>cargo build --workspace</code>.
+            </li>
+
+            <li>
+              <strong>Core vs. Service:</strong> The <code>solver-core</code>{" "}
+              library is where the thinking happens. The{" "}
+              <code>solver-service</code> just runs it.{" "}
+              <strong>This is the most important pattern here.</strong> It means
+              we can write simple unit tests for the hard parts without needing
+              to spin up a server.
+            </li>
+
+            <li>
+              <strong>Off-Chain First:</strong> All the heavy lifting (finding
+              the best route, simulations, etc.) happens off-chain in our Rust
+              code. On-chain programs should be simple and just execute what
+              they're told.
+            </li>
+          </ol>
+
+          <h3>Tech Stack</h3>
+
+          <ul>
+            <li>
+              <strong>Backend:</strong> Rust, Axum, Tokio
+            </li>
+            <li>
+              <strong>Frontend:</strong> Next.js, TypeScript, Tailwind CSS,
+              Solana Wallet Adapter
+            </li>
+            <li>
+              <strong>On-Chain:</strong> Anchor (Rust)
+            </li>
+            <li>
+              <strong>CI/CD:</strong> GitHub Actions
+            </li>
+          </ul>
+        </article>
+
+        {/* Footer Navigation */}
+        <div className="mt-16 pt-8 border-t border-gray-800">
+          <div className="flex justify-between items-center">
+            <Link
+              href="/docs/about"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              About
+            </Link>
+
+            <Link
+              href="/docs/instructions"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-all"
+            >
+              Instructions
+              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+    </ClientPageWrapper>
+
+);
+}

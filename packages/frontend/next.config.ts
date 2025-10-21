@@ -1,7 +1,47 @@
 import type { NextConfig } from "next";
+import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Configure `pageExtensions` to include MDX files
+  pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
+  // Performance optimizations
+  experimental: {
+    optimizeCss: true,
+  },
+  // Fix for pino-pretty module resolution in browser
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        stream: false,
+        url: false,
+        zlib: false,
+        http: false,
+        https: false,
+        assert: false,
+        os: false,
+        path: false,
+      };
+    }
+
+    // Handle pino-pretty module resolution
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "pino-pretty": false,
+    };
+
+    return config;
+  },
+  // Optionally, add any other Next.js config below
 };
 
-export default nextConfig;
+const withMDX = createMDX({
+  // Add markdown plugins here, as desired
+});
+
+// Wrap MDX and Next.js config together
+export default withMDX(nextConfig);

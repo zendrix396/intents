@@ -1,0 +1,319 @@
+import { Navbar } from "@/components/Navbar";
+import Link from "next/link";
+import { ClientPageWrapper } from "@/components/ClientPageWrapper";
+
+export default function AboutPage() {
+  
+  return (
+    <ClientPageWrapper currentPage="/docs/about">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+        <Navbar />
+
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        {/* Breadcrumb Navigation */}
+        <nav className="mb-8">
+          <div className="flex items-center space-x-2 text-sm text-gray-400">
+            <Link href="/docs" prefetch={true} className="hover:text-white transition-colors">
+              Documentation
+            </Link>
+            <span>/</span>
+            <span className="text-white">About</span>
+          </div>
+        </nav>
+
+        {/* Hero Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 mb-6">
+            <div className="w-2 h-2 rounded-full bg-purple-400 mr-3 animate-pulse" />
+            <span className="text-sm font-medium text-purple-300">Intent-Centric Layer</span>
+          </div>
+
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-6">
+            An Intent-Centric Layer for Solana
+          </h1>
+
+          <p className="text-xl text-gray-400 leading-relaxed max-w-3xl">
+            This document outlines what we're building, why it's cool, and how we plan to get there.
+          </p>
+        </div>
+
+        <article className="prose prose-invert prose-lg max-w-none prose-headings:text-white prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-300 prose-p:leading-relaxed prose-strong:text-white prose-code:text-purple-300 prose-code:bg-gray-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-blockquote:border-l-purple-500 prose-blockquote:bg-gray-800/50 prose-blockquote:border prose-blockquote:border-gray-700 prose-blockquote:rounded-r-lg prose-ul:text-gray-300 prose-ol:text-gray-300">
+          <h1>An Intent-Centric Layer for Solana</h1>
+
+          <p>
+            This document outlines what we're building, why it's cool, and how
+            we plan to get there.
+          </p>
+
+          <h2>What is This Thing? (The TL;DR)</h2>
+
+          <p>
+            Right now, using DeFi on Solana means telling the blockchain{" "}
+            <em>exactly</em> what to do: "Swap X for Y on Raydium with 0.5%
+            slippage."
+          </p>
+
+          <p>
+            We're building an <strong>intent-centric execution layer</strong>.
+          </p>
+
+          <p>
+            Instead of giving detailed instructions, a user just states their
+            goal (their "intent"):
+          </p>
+
+          <blockquote>
+            <p>"I want to swap 1 SOL and get the most USDC possible."</p>
+          </blockquote>
+
+          <p>
+            Our system's job is to figure out the <strong>best way</strong> to
+            make that happen and then do it for them.
+          </p>
+
+          <h2>The Interface: How Users Interact</h2>
+
+          <p>
+            The power of an intent-based system is its flexibility. The core
+            solver logic is completely separate from how a user submits their
+            intent. We plan to support multiple interfaces:
+          </p>
+
+          <ul>
+            <li>
+              <strong>REST API:</strong> The primary interface for developers
+              and our own frontend. Other dApps, wallets, and services will be
+              able to integrate with our solver by calling a simple API
+              endpoint.
+            </li>
+            <li>
+              <strong>Frontend Web App:</strong> A clean, user-friendly
+              interface for end-users to connect their wallet and create intents
+              through a simple form.
+            </li>
+            <li>
+              <strong>Telegram/Discord Bots (Future):</strong> Users will be
+              able to type natural language commands like{" "}
+              <code>/swap 1 sol for usdc</code> in a chat, and the bot will
+              guide them through the process.
+            </li>
+          </ul>
+
+          <h2>Who Is This For?</h2>
+
+          <ol>
+            <li>
+              <strong>Users:</strong> Who want better prices and a simpler
+              experience without having to manually compare DEXs or route swaps.
+            </li>
+            <li>
+              <strong>Developers:</strong> Who are building applications
+              (wallets, dApps, bots) and want to offer their users the best
+              execution without building a complex routing engine themselves.
+            </li>
+            <li>
+              <strong>Sophisticated Traders:</strong> Who want to express
+              complex intents, like "Sell my 100 BONK for SOL, but only if the
+              price is above $X, and do it over the next hour to minimize
+              impact."
+            </li>
+          </ol>
+
+          <h2>How It Works: The Core Components</h2>
+
+          <h3>1. The Intent Submission API</h3>
+
+          <p>
+            This is the front door. It will be a simple REST API running in our{" "}
+            <code>solver-service</code>.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Endpoint:</strong> <code>POST /intents</code>
+            </li>
+            <li>
+              <strong>Payload:</strong> A JSON object describing the user's
+              goal.
+            </li>
+          </ul>
+
+          <pre>
+            <code>{`{
+
+"type": "MAX_RETURN_SWAP",
+"inputMint": "So11111111111111111111111111111111111111112",
+"outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+"inputAmount": 1000000000
+}`}</code>
+
+</pre>
+
+          <h3>2. The Solver (solver-core)</h3>
+
+          <p>
+            This is the heart of the system. When the API gets an intent, it
+            passes it to the solver. The solver's job is to find the most
+            optimal execution path.
+          </p>
+
+          <p>
+            <strong>How it finds the "best" path:</strong>
+          </p>
+
+          <ul>
+            <li>
+              <strong>Data Gathering:</strong> It will constantly monitor the
+              Solana network, pulling data from:
+              <ul>
+                <li>
+                  <strong>Liquidity Pools:</strong> Raydium, Orca, Jupiter, etc.
+                </li>
+                <li>
+                  <strong>Oracles:</strong> Pyth and Switchboard for real-time
+                  asset prices.
+                </li>
+                <li>
+                  <strong>Network Fees:</strong> Jito's bundle endpoint and
+                  Solana's <code>getRecentPriorityFees</code> to understand
+                  current transaction costs.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Heuristics & Solvers:</strong> This is where the magic
+              happens. We'll start simple and build up.
+              <ol>
+                <li>
+                  <strong>Simple Heuristics (Phase 1):</strong> At first, the
+                  solver will use basic rules. For a swap, it might just query
+                  the Jupiter API for the best route and use that. This is our
+                  MVP.
+                </li>
+                <li>
+                  <strong>Custom Routing (Phase 2):</strong> We'll build our own
+                  routing logic to find paths Jupiter might miss, like splitting
+                  a trade across multiple DEXs.
+                </li>
+                <li>
+                  <strong>ML-Powered Solvers (Phase 3):</strong> This is the
+                  end-game. We'll use the <code>services</code> package
+                  (placeholder for a Python/FastAPI service) to run more
+                  advanced models. The Rust solver will send intent data to this
+                  service, which could use machine learning to predict price
+                  impact or find complex arbitrage opportunities (e.g., A → B →
+                  C → A) that can be bundled with the user's trade to give them
+                  an even better price.
+                </li>
+              </ol>
+            </li>
+            <li>
+              <strong>The Output:</strong> The solver's final output is a
+              ready-to-send, fully constructed Solana transaction (or a series
+              of them).
+            </li>
+          </ul>
+
+          <h3>3. The Executor / Relayer</h3>
+
+          <p>
+            Once the solver creates the transaction, something has to sign it
+            and send it to the network.
+          </p>
+
+          <ul>
+            <li>
+              The <code>solver-service</code> will act as the relayer. It will
+              manage a secure keypair (the "hot wallet") to pay for transaction
+              fees.
+            </li>
+            <li>
+              It will use a robust transaction-sending function that includes{" "}
+              <strong>priority fees</strong> to ensure our transactions are
+              processed quickly, even when the network is busy.
+            </li>
+          </ul>
+
+          <h3>4. The Frontend</h3>
+
+          <p>
+            The user interface will be a clean, simple web app where users can:
+          </p>
+
+          <ol>
+            <li>
+              <strong>Connect their wallet.</strong>
+            </li>
+            <li>
+              <strong>Express an intent</strong> through a simple form (e.g., "I
+              want to swap...").
+            </li>
+            <li>
+              <strong>Approve the final transaction.</strong> For self-custody,
+              the user will sign the transaction that the solver proposes. In a
+              more advanced version, they might delegate funds to a secure
+              on-chain vault that the solver can use to execute trades on their
+              behalf.
+            </li>
+          </ol>
+
+          <h2>Tech Stack Summary</h2>
+
+          <ul>
+            <li>
+              <strong>Solver & API:</strong> Rust (Tokio, Axum)
+            </li>
+            <li>
+              <strong>Advanced Heuristics (Future):</strong> Python (FastAPI,
+              scikit-learn/PyTorch)
+            </li>
+            <li>
+              <strong>Frontend:</strong> Next.js (TypeScript, React)
+            </li>
+            <li>
+              <strong>On-Chain (Future):</strong> Anchor (Rust)
+            </li>
+            <li>
+              <strong>Documentation:</strong> MDX within the Next.js app.
+            </li>
+          </ul>
+
+          <p>
+            This approach gives us the performance of Rust for the core,
+            real-time components, the power of Python for complex offline
+            analysis, and the rapid development of Next.js for the user
+            interface.
+          </p>
+        </article>
+
+        {/* Footer Navigation */}
+        <div className="mt-16 pt-8 border-t border-gray-800">
+          <div className="flex justify-between items-center">
+            <Link
+              href="/docs"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Documentation
+            </Link>
+
+            <Link
+              href="/docs/architecture"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 transition-all"
+            >
+              Architecture
+              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+    </ClientPageWrapper>
+  );
+}

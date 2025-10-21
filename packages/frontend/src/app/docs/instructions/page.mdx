@@ -1,0 +1,801 @@
+import { Navbar } from "@/components/Navbar";
+import Link from "next/link";
+import { ClientPageWrapper } from "@/components/ClientPageWrapper";
+
+export default function InstructionsPage() {
+  
+  return (
+    <ClientPageWrapper currentPage="/docs/instructions">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+        <Navbar />
+
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        {/* Breadcrumb Navigation */}
+        <nav className="mb-8">
+          <div className="flex items-center space-x-2 text-sm text-gray-400">
+            <Link href="/docs" prefetch={true} className="hover:text-white transition-colors">
+              Documentation
+            </Link>
+            <span>/</span>
+            <span className="text-white">Instructions</span>
+          </div>
+        </nav>
+
+        {/* Hero Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 mb-6">
+            <div className="w-2 h-2 rounded-full bg-green-400 mr-3 animate-pulse" />
+            <span className="text-sm font-medium text-green-300">Development Guide</span>
+          </div>
+
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-6">
+            A Manifesto for Building Robust Solana Applications
+          </h1>
+
+          <p className="text-xl text-gray-400 leading-relaxed max-w-3xl">
+            The Solana ecosystem has matured significantly. The days of monolithic, difficult-to-test programs are giving way to modular, well-structured, and highly professional engineering practices.
+          </p>
+        </div>
+
+        <article className="prose prose-invert prose-lg max-w-none prose-headings:text-white prose-headings:font-bold prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:text-gray-300 prose-p:leading-relaxed prose-strong:text-white prose-code:text-green-300 prose-code:bg-gray-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700 prose-blockquote:border-l-green-500 prose-blockquote:bg-gray-800/50 prose-blockquote:border prose-blockquote:border-gray-700 prose-blockquote:rounded-r-lg prose-ul:text-gray-300 prose-ol:text-gray-300 prose-hr:border-gray-700">
+          <h1>A Manifesto for Building Robust Solana Applications</h1>
+
+          <h2>Introduction</h2>
+
+          <p>
+            The Solana ecosystem has matured significantly. The days of
+            monolithic, difficult-to-test programs are giving way to modular,
+            well-structured, and highly professional engineering practices. This
+            guide synthesizes the best patterns observed in mature Solana
+            projects to provide a comprehensive framework for your development
+            journey. We will cover the full stack, from the on-chain Rust
+            programs to the off-chain services, clients, and tooling that bring
+            a project to life.
+          </p>
+
+          <hr />
+
+          <h2>Part 1: High-Level Architectural Patterns</h2>
+
+          <p>
+            Before writing a single line of code, it's crucial to establish a
+            high-level architecture that promotes scalability, maintainability,
+            and a clean separation of concerns.
+          </p>
+
+          <h3>1.1 The Monorepo Workspace: Your Project's Foundation</h3>
+
+          <p>
+            All the provided examples implicitly or explicitly favor a monorepo
+            structure. This is a powerful pattern where all your project's
+            code—on-chain programs, off-chain services, frontend clients, and
+            CLIs—lives in a single Git repository.
+          </p>
+
+          <p>
+            <strong>Best Practice:</strong> Use a{" "}
+            <strong>Rust Workspace</strong> at the root of your monorepo. This
+            is the gold standard for managing multiple Rust crates.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Inspiration:</strong> <code>fast-paytube/Cargo.toml</code>
+              <pre>
+                <code>{`[workspace]
+
+members = [
+"fast-init", // The executable binary
+"fast-core" // The core logic library
+]`}</code>
+              </pre>
+            </li>
+            <li>
+              <strong>
+                Your Project's <code>Cargo.toml</code>:
+              </strong>
+              <pre>
+                <code>{`[workspace]
+resolver = "2" # Use the modern resolver
+members = [
+"programs/*", # All your on-chain Anchor programs
+"solver", # Your core intent-solving logic
+"solver-service" # A runnable binary that uses the solver
+]`}</code>
+
+</pre>
+</li>
+<li>
+<strong>Why this is a best practice:</strong>
+<ul>
+<li>
+<strong>Unified Dependency Management:</strong> A single{" "}
+<code>Cargo.lock</code> file at the root ensures all your Rust
+crates use the exact same versions of dependencies,
+eliminating version conflicts and ensuring reproducible
+builds.
+</li>
+<li>
+<strong>Simplified Refactoring:</strong> If you change a data
+structure in a shared core crate, the Rust compiler will
+instantly tell you every other crate that needs to be updated.
+</li>
+<li>
+<strong>Streamlined CI/CD:</strong> You can build and test all
+your Rust components with a single{" "}
+<code>cargo build --workspace</code> and{" "}
+<code>cargo test --workspace</code> command.
+</li>
+</ul>
+</li>
+</ul>
+
+          <h3>1.2 On-Chain vs. Off-Chain: A Strict Separation</h3>
+
+          <p>
+            Blockchain applications are inherently split. The on-chain code is
+            limited, expensive, and must be perfect. The off-chain code does all
+            the heavy lifting. Your architecture must enforce this separation.
+          </p>
+
+          <ul>
+            <li>
+              <strong>
+                On-Chain Code (<code>programs/</code> directory):
+              </strong>
+              <ul>
+                <li>Written in Rust, using the Anchor framework.</li>
+                <li>
+                  <strong>Responsibilities:</strong> Enforcing rules, managing
+                  state, verifying permissions, and performing atomic
+                  operations. It should be as "dumb" as possible, simply
+                  executing valid, pre-formed instructions.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>
+                Off-Chain Code (<code>solver/</code>, <code>services/</code>,{" "}
+                <code>cli/</code> directories):
+              </strong>
+              <ul>
+                <li>
+                  Can be written in Rust (for performance) or TypeScript/Node.js
+                  (for rapid development).
+                </li>
+                <li>
+                  <strong>Responsibilities:</strong> Everything else. For your
+                  project, this includes:
+                  <ul>
+                    <li>Listening for user intents.</li>
+                    <li>
+                      Querying on-chain data from multiple sources (DEXs, oracle
+                      prices).
+                    </li>
+                    <li>
+                      Running complex algorithms to find the "best" execution
+                      path (the <strong>solver</strong>).
+                    </li>
+                    <li>Constructing the complex transactions.</li>
+                    <li>
+                      Submitting transactions and handling network retries (the{" "}
+                      <strong>relayer</strong>).
+                    </li>
+                    <li>Providing a user interface (API, frontend, or CLI).</li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>
+            1.3 Core Logic vs. Binary: The <code>fast-core</code> Pattern
+          </h3>
+
+          <p>
+            This is one of the most powerful and reusable patterns for building
+            high-quality Rust applications.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Inspiration:</strong> The <code>fast-paytube</code>{" "}
+              project's separation of <code>fast-core</code> (a library) and{" "}
+              <code>fast-init</code> (a binary).
+            </li>
+            <li>
+              <strong>Best Practice:</strong> Your primary off-chain logic, the{" "}
+              <strong>solver</strong>, should be a{" "}
+              <strong>library crate</strong>.
+              <ul>
+                <li>
+                  <strong>
+                    <code>solver/src/lib.rs</code>:
+                  </strong>{" "}
+                  This crate defines the structs for <code>Intent</code> and{" "}
+                  <code>Solution</code>, the traits for different solving
+                  strategies, and the core functions that take an intent and
+                  return a set of transactions. It should not contain any{" "}
+                  <code>main</code> function.
+                </li>
+                <li>
+                  <strong>Why?</strong> This makes your core logic infinitely
+                  reusable and testable. You can write unit tests directly
+                  against your solver functions without needing to spin up a
+                  server or mock a command-line interface.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Best Practice:</strong> Create a separate{" "}
+              <strong>binary crate</strong> that depends on your solver library.
+              <ul>
+                <li>
+                  <strong>
+                    <code>solver-service/src/main.rs</code>:
+                  </strong>{" "}
+                  This crate's sole purpose is to be the "runtime" for your
+                  solver. It will:
+                  <ol>
+                    <li>
+                      Parse command-line arguments (using <code>clap</code>).
+                    </li>
+                    <li>Read a configuration file.</li>
+                    <li>Initialize a connection to Solana.</li>
+                    <li>
+                      Call the functions from your <code>solver</code> library
+                      to do the actual work.
+                    </li>
+                    <li>
+                      Expose the solver's functionality (e.g., via an HTTP
+                      server, a message queue consumer, or a simple loop).
+                    </li>
+                  </ol>
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>1.4 Client/SDK Generation and Wrapper Classes</h3>
+
+          <p>
+            Interacting with an on-chain program from off-chain code can be
+            cumbersome. Modern tooling automates this.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Inspiration:</strong>
+              <ul>
+                <li>
+                  <code>assetCLI</code> uses Anchor's ability to generate a
+                  TypeScript client from the program's IDL.
+                </li>
+                <li>
+                  <code>pinocchio-stake/client</code> uses <code>Solita</code>{" "}
+                  to generate a TypeScript SDK.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Best Practice:</strong>{" "}
+              <strong>Always auto-generate your client.</strong>
+              <ul>
+                <li>
+                  <strong>Anchor:</strong> Use <code>anchor idl parse</code> and{" "}
+                  <code>anchor idl build</code> to create the IDL and TypeScript
+                  types. The <code>assetCLI/scripts/cp-types.sh</code> script
+                  shows a simple way to automate copying these generated files
+                  into your client code.
+                </li>
+                <li>
+                  <strong>Solita:</strong> A powerful tool for generating clean,
+                  type-safe clients from an IDL, as seen in{" "}
+                  <code>pinocchio-stake</code>.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Best Practice:</strong> Create{" "}
+              <strong>Service/Wrapper Classes</strong> around the generated
+              client.
+              <ul>
+                <li>
+                  <strong>Inspiration:</strong>{" "}
+                  <code>assetCLI/src/services/bonding-curve-service.ts</code>.
+                  Instead of calling{" "}
+                  <code>program.methods.createBondingCurve(...)</code> directly
+                  in the UI or command logic, there's a{" "}
+                  <code>BondingCurveService</code> that provides a clean method
+                  like <code>async createBondingCurve(params)</code>.
+                </li>
+                <li>
+                  <strong>Why?</strong> This abstraction layer is critical. It
+                  hides the complexity of account resolution, PDA finding, and
+                  instruction building. Your UI or API code can simply call{" "}
+                  <code>solverService.submitIntent(...)</code> without needing
+                  to know about the underlying Solana transaction details.
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <hr />
+
+          <h2>Part 2: On-Chain Development with Anchor</h2>
+
+          <p>
+            Anchor is the undisputed standard for building secure and ergonomic
+            Solana programs.
+          </p>
+
+          <h3>2.1 Latest Versions and Dependencies (as of late 2025)</h3>
+
+          <ul>
+            <li>
+              <strong>Anchor:</strong> You should be on{" "}
+              <code>anchor-lang = "0.31.0"</code> or newer. This version
+              includes important features like the <code>init_if_needed</code>{" "}
+              constraint, better event support, and improved CPI clients.
+            </li>
+            <li>
+              <strong>Solana Program:</strong>{" "}
+              <code>solana-program = "1.18.x"</code> or newer.
+            </li>
+            <li>
+              <strong>CPI Crates:</strong> When interacting with other
+              protocols, use their official CPI crates if available, as seen in{" "}
+              <code>assetCLI</code> with <code>raydium-cpmm-cpi</code>.
+            </li>
+          </ul>
+
+          <h3>2.2 Code Structure within an Anchor Program</h3>
+
+          <ul>
+            <li>
+              <strong>Inspiration:</strong>{" "}
+              <code>
+                assetCLI/programs/bonding-curve/programs/bonding-curve/src/
+              </code>
+            </li>
+            <li>
+              <strong>Best Practice:</strong>
+              <ul>
+                <li>
+                  <code>lib.rs</code>: The main entry point. It should contain
+                  the <code>#[program]</code> module and the public function
+                  definitions for each instruction. Keep it clean and delegate
+                  all logic to instruction-specific modules.
+                </li>
+                <li>
+                  <code>instructions/</code>: A directory where each{" "}
+                  <code>.rs</code> file implements the logic for a single
+                  instruction. Each file contains the{" "}
+                  <code>#[derive(Accounts)]</code> struct and the{" "}
+                  <code>process</code> function.
+                </li>
+                <li>
+                  <code>state/</code>: A directory where each <code>.rs</code>{" "}
+                  file defines a program account (<code>#[account]</code>) or a
+                  shared state struct.
+                </li>
+                <li>
+                  <code>errors.rs</code>: A dedicated file for your{" "}
+                  <code>#[error_code]</code> enum. This keeps all possible
+                  failure states in one place.
+                </li>
+                <li>
+                  <code>events.rs</code>: A file for defining on-chain events (
+                  <code>#[event]</code>).
+                </li>
+                <li>
+                  <code>constants.rs</code>: For any on-chain constants.
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>2.3 State Management and PDAs</h3>
+
+          <ul>
+            <li>
+              <strong>Program Derived Addresses (PDAs):</strong> All
+              program-owned accounts should be PDAs. This allows your program to
+              sign for them, creating "program-controlled" accounts.
+            </li>
+            <li>
+              <strong>
+                <code>init_if_needed</code>:
+              </strong>{" "}
+              For accounts that might need to be created on-demand (like an
+              Associated Token Account or a user-specific data account),{" "}
+              <code>init_if_needed</code> is the modern, preferred approach. It
+              combines creation and access into a single, idempotent
+              instruction.
+            </li>
+            <li>
+              <strong>
+                Account Sizing (<code>space</code>):
+              </strong>{" "}
+              Always define the space for your accounts. Use{" "}
+              <code>8 + MyAccount::INIT_SPACE</code> where{" "}
+              <code>INIT_SPACE</code> is derived using the{" "}
+              <code>InitSpace</code> macro from Anchor on your struct. For
+              variable-sized data like <code>String</code> or <code>Vec</code>,
+              use <code>#[max_len(N)]</code> attributes as seen in{" "}
+              <code>dmandate/programs/dmandate/src/state/user.rs</code>.
+            </li>
+            <li>
+              <strong>
+                Closing Accounts (<code>close = &lt;destination&gt;</code>):
+              </strong>{" "}
+              When an account is no longer needed, use the <code>close</code>{" "}
+              constraint to reclaim the lamports locked for rent. This is a
+              crucial practice for good on-chain hygiene.
+            </li>
+          </ul>
+
+          <h3>2.4 Secure and Robust Instruction Logic</h3>
+
+          <ul>
+            <li>
+              <strong>Validation First:</strong> The first thing every
+              instruction handler should do is validate all inputs and account
+              constraints. Use Anchor's <code>require!</code> macros with custom
+              errors.
+              <ul>
+                <li>
+                  <code>
+                    require_keys_eq!(account1.key(), account2.key(),
+                    MyError::InvalidAccount)
+                  </code>
+                </li>
+                <li>
+                  <code>
+                    require!(amount &gt; 0, MyError::AmountMustBePositive)
+                  </code>
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Signer Checks:</strong> Anchor handles basic signer checks
+              (<code>Signer</code> type), but always double-check that the
+              correct party is signing, especially for privileged instructions.
+            </li>
+            <li>
+              <strong>Custom Errors:</strong> Use a detailed{" "}
+              <code>#[error_code]</code> enum.{" "}
+              <code>
+                assetCLI/programs/bonding-curve/programs/bonding-curve/src/errors.rs
+              </code>{" "}
+              is a great example. This makes debugging off-chain a thousand
+              times easier, as you get a specific code instead of a generic
+              transaction failure.
+            </li>
+            <li>
+              <strong>Cross-Program Invocations (CPIs):</strong>
+              <ul>
+                <li>
+                  Use Anchor's typed CPI interfaces (<code>CpiContext</code>).
+                </li>
+                <li>
+                  Always use <code>invoke_signed</code> when calling from a PDA,
+                  passing in the PDA seeds. The <code>get_signer_seeds()</code>{" "}
+                  helper function in{" "}
+                  <code>
+                    assetCLI/programs/bonding-curve/programs/bonding-curve/src/instructions/curve/create_bonding_curve.rs
+                  </code>{" "}
+                  is a good pattern.
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <hr />
+
+          <h2>Part 3: Off-Chain Development Best Practices</h2>
+
+          <p>
+            This is where the complex logic of your intent-centric layer will
+            live.
+          </p>
+
+          <h3>3.1 The Rust Solver: Performance is Key</h3>
+
+          <p>
+            Your solver needs to be fast. It will likely perform many
+            calculations, simulations, and data fetching. Rust is the ideal
+            choice here.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Asynchronous Everywhere with Tokio:</strong> All network
+              calls (to the Solana RPC) and potentially CPU-intensive
+              calculations should be asynchronous. Use <code>tokio</code> as
+              your runtime.
+              <ul>
+                <li>
+                  <strong>Libraries:</strong> <code>solana-client</code> (for
+                  RPC communication), <code>solana-sdk</code>,{" "}
+                  <code>tokio</code>, <code>serde</code>, and <code>clap</code>{" "}
+                  (for the binary wrapper).
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>
+                Error Handling with <code>anyhow</code> or{" "}
+                <code>thiserror</code>:
+              </strong>
+              <ul>
+                <li>
+                  <code>thiserror</code>: For your solver library crate. It lets
+                  you create detailed, custom error types.
+                </li>
+                <li>
+                  <code>anyhow</code>: For your binary crate. It's great for
+                  application-level error handling where you just need to bubble
+                  up any error and display it.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Data Structures:</strong> Define clear, serializable
+              structs for <code>Intent</code>, <code>ExecutionPath</code>, and{" "}
+              <code>Solution</code>. Use <code>serde</code> to easily
+              serialize/deserialize them.
+            </li>
+          </ul>
+
+          <h3>3.2 TypeScript/Node.js for Services and Clients</h3>
+
+          <p>
+            For APIs, CLIs, and services that are less performance-critical,
+            TypeScript offers faster development and a massive ecosystem.
+          </p>
+
+          <ul>
+            <li>
+              <strong>Latest Versions (as of late 2025):</strong>
+              <ul>
+                <li>
+                  <code>@solana/web3.js</code>: Version <code>^1.98.x</code> or
+                  newer.
+                </li>
+                <li>
+                  <code>@coral-xyz/anchor</code>: Version <code>^0.31.x</code>{" "}
+                  or newer.
+                </li>
+                <li>
+                  <code>@solana/spl-token</code>: Version <code>^0.4.x</code> or
+                  newer.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>
+                Project Structure (<code>assetCLI</code>):
+              </strong>
+              <ul>
+                <li>
+                  <code>src/services/</code>: Your wrapper classes (e.g.,{" "}
+                  <code>bonding-curve-service.ts</code>).
+                </li>
+                <li>
+                  <code>src/commands/</code>: If building a CLI, each file
+                  defines a command.
+                </li>
+                <li>
+                  <code>src/utils/</code>: Reusable helper functions (e.g.,
+                  transaction sending logic, constants).
+                </li>
+                <li>
+                  <code>src/types/</code>: Contains the auto-generated types
+                  from your Anchor program.
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>Reliable Transaction Sending:</strong> Solana's network
+              can be congested. Don't just{" "}
+              <code>sendAndConfirmTransaction</code>.
+              <ul>
+                <li>
+                  <strong>Best Practice:</strong> Build a robust{" "}
+                  <code>sendTx</code> utility function as seen in{" "}
+                  <code>assetCLI/src/utils/send_tx.ts</code>. This function
+                  should:
+                  <ol>
+                    <li>
+                      Use <code>getLatestBlockhash</code> right before sending.
+                    </li>
+                    <li>
+                      Include <code>ComputeBudgetProgram</code> instructions to
+                      request more compute units and set a priority fee. This is{" "}
+                      <strong>essential</strong> for getting your transactions
+                      included in a block.
+                    </li>
+                    <li>
+                      Send the transaction with{" "}
+                      <code>skipPreflight: false</code>.
+                    </li>
+                    <li>
+                      Use a loop with a timeout to poll for the transaction
+                      status using <code>getSignatureStatuses</code>.
+                    </li>
+                  </ol>
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <hr />
+
+          <h2>Part 4: Tooling, Testing, and Deployment</h2>
+
+          <p>Professional projects require professional tooling.</p>
+
+          <h3>4.1 Comprehensive Testing Strategy</h3>
+
+          <ul>
+            <li>
+              <strong>Rust Unit Tests:</strong> For pure logic in your Rust
+              crates (e.g., a function that calculates the best swap route from
+              a given set of data), write standard Rust unit tests (
+              <code>#[cfg(test)]</code>).
+            </li>
+            <li>
+              <strong>Anchor Integration Tests:</strong> Use Anchor's TypeScript
+              testing framework. This is the primary way to test your on-chain
+              programs. It spins up a local validator, deploys your program, and
+              lets you execute transactions against it. The{" "}
+              <code>tests/dmandate.ts</code> file is a perfect example.
+              <ul>
+                <li>
+                  <strong>
+                    Test Setup (<code>before</code> block):
+                  </strong>{" "}
+                  Airdrop SOL to test wallets, create necessary mints and token
+                  accounts.
+                </li>
+                <li>
+                  <strong>
+                    Test Cases (<code>it</code> blocks):
+                  </strong>{" "}
+                  Test both the "happy path" (successful execution) and failure
+                  cases (e.g., "fails to execute payment too early").
+                </li>
+              </ul>
+            </li>
+            <li>
+              <strong>
+                Local Development with <code>solana-test-validator</code>:
+              </strong>
+              <ul>
+                <li>
+                  <strong>Inspiration:</strong>{" "}
+                  <code>assetCLI/scripts/local-dev.sh</code>.
+                </li>
+                <li>
+                  <strong>Best Practice:</strong> Create a script that starts a
+                  local validator and clones all the mainnet programs your
+                  solver will interact with (e.g., Jupiter, Raydium pools,
+                  Metaplex). This allows you to test your entire end-to-end flow
+                  locally without spending real funds.
+                </li>
+              </ul>
+            </li>
+          </ul>
+
+          <h3>4.2 CI/CD with GitHub Actions</h3>
+
+          <ul>
+            <li>
+              <strong>Inspiration:</strong> The <code>.github/workflows/</code>{" "}
+              files in the <code>assetCLI</code> and <code>dmandate</code>{" "}
+              projects.
+            </li>
+            <li>
+              <strong>Best Practice:</strong> Set up a CI pipeline that runs on
+              every push. It should:
+              <ol>
+                <li>Install Rust, Node.js, and the Solana tool suite.</li>
+                <li>
+                  Run <code>cargo check</code> and <code>cargo clippy</code> on
+                  your Rust code.
+                </li>
+                <li>
+                  Build your Anchor program (<code>anchor build</code>).
+                </li>
+                <li>
+                  Start a <code>solana-test-validator</code>.
+                </li>
+                <li>
+                  Run your Anchor integration tests (
+                  <code>anchor test --skip-local-validator</code>).
+                </li>
+              </ol>
+            </li>
+          </ul>
+
+          <hr />
+
+          <h2>Conclusion</h2>
+
+          <p>
+            Building a sophisticated intent-centric execution layer is a
+            significant undertaking. By drawing inspiration from the robust
+            patterns established by leading projects in the Solana ecosystem,
+            you can set yourself up for success.
+          </p>
+
+          <p>
+            <strong>Key Takeaways:</strong>
+          </p>
+
+          <ol>
+            <li>
+              <strong>Structure is Everything:</strong> Adopt a monorepo with a
+              Rust workspace. Strictly separate on-chain and off-chain concerns.
+            </li>
+            <li>
+              <strong>Modularize Your Logic:</strong> Use the{" "}
+              <code>core-library</code> vs. <code>binary-executable</code>{" "}
+              pattern for your Rust components, especially the solver.
+            </li>
+            <li>
+              <strong>Leverage the Full Toolchain:</strong> Use Anchor for
+              on-chain development, auto-generate your clients with Anchor or
+              Solita, and build clean service wrappers in TypeScript.
+            </li>
+            <li>
+              <strong>Test Rigorously:</strong> Combine Rust unit tests with
+              Anchor's TypeScript integration tests and a full localnet
+              environment that mirrors mainnet.
+            </li>
+            <li>
+              <strong>Build for the Real World:</strong> Implement robust
+              transaction sending logic with priority fees and retries.
+            </li>
+          </ol>
+
+          <p>
+            By following this guide, you will be well on your way to building a
+            project that is not only functional but also maintainable, scalable,
+            and a pleasure to work on.
+          </p>
+        </article>
+
+        {/* Footer Navigation */}
+        <div className="mt-16 pt-8 border-t border-gray-800">
+          <div className="flex justify-between items-center">
+            <Link
+              href="/docs/architecture"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Architecture
+            </Link>
+
+            <Link
+              href="/docs"
+              prefetch={true}
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 transition-all"
+            >
+              Back to Docs
+              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+    </ClientPageWrapper>
+
+);
+}
