@@ -25,7 +25,7 @@ export default function DocsIndexPage() {
 
                 {/* Documentation Cards */}
                 <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                    {docsNav.map((doc, index) => (
+                    {docsNav.map((doc) => (
                         <Link
                             key={doc.slug}
                             href={`/docs/${doc.slug}`}

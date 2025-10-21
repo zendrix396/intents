@@ -8,6 +8,21 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizeCss: true,
   },
+  // Enable Turbopack for faster builds (Next.js 15+)
+  turbopack: {
+    rules: {
+      "*.svg": {
+        loaders: ["@svgr/webpack"],
+        as: "*.js",
+      },
+    },
+  },
+  // Optimize images
+  images: {
+    formats: ["image/webp", "image/avif"],
+  },
+  // Enable compression
+  compress: true,
   // Fix for pino-pretty module resolution in browser
   webpack: (config, { isServer }) => {
     if (!isServer) {
