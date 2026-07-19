@@ -98,7 +98,7 @@ curl -X POST http://localhost:3000/solve \
 
 ## `POST /execute`
 
-Execute a swap by getting a quote from Jupiter, decoding the transaction, signing it with the payer wallet, and submitting it to Solana.
+Execute a swap by getting a quote from Jupiter, decoding the transaction, signing it with the payer wallet, and submitting it to Solana. Includes automatic retry logic with exponential backoff (up to 3 retries) for transient failures.
 
 ### Request Body
 
@@ -115,16 +115,34 @@ Same as `/solve`:
 
 ```json
 {
-  "signature": "5JcK7...TxSig"
+  "signature": "5JcK7...TxSig",
+  "priorityFee": 5000,
+  "priorityFeeUnit": "micro_lamports_per_cu",
+  "executionTimeMs": 1234,
+  "inAmount": "1000000000",
+  "outAmount": "150000000"
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `signature` | string | Solana transaction signature |
+| `priorityFee` | number | Current high priority fee in micro-lamports/CU |
+| `priorityFeeUnit` | string | Unit for the priority fee |
+| `executionTimeMs` | number | Total execution time in milliseconds |
+| `inAmount` | string | Input amount used in the swap |
+| `outAmount` | string | Output amount received |
 
 ### Error Responses
 
 | Status | Condition |
 |--------|-----------|
 | 400 | Invalid request fields |
-| 500 | Transaction failed or Jupiter API error |
+| 500 | Transaction failed after retries or Jupiter API error |
+
+### Retry Behavior
+
+The executor retries failed transactions up to 3 times with exponential backoff (1s, 2s, 4s). Non-retryable errors (invalid signatures, simulation failures, insufficient funds) are not retried.
 
 ---
 
@@ -138,6 +156,38 @@ Send a small test transaction (0.001 SOL self-transfer) to verify the payer wall
 {
   "signature": "5JcK7...TxSig"
 }
+```
+
+---
+
+## `GET /fees`
+
+Returns current network priority fees with descriptions for each level. Useful for showing fee estimates in the UI before execution.
+
+### Response
+
+```json
+{
+  "priority_fees": {
+    "low": 1000,
+    "medium": 5000,
+    "high": 10000,
+    "very_high": 25000
+  },
+  "unit": "micro_lamports_per_cu",
+  "description": {
+    "low": "Cheapest, may take longer to land",
+    "medium": "Balanced cost and speed",
+    "high": "Fast inclusion, recommended for most swaps",
+    "very_high": "Highest priority, fastest inclusion"
+  }
+}
+```
+
+### Example
+
+```bash
+curl http://localhost:3000/fees
 ```
 
 ---

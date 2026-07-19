@@ -14,6 +14,15 @@ export interface JupiterOrderResponse {
   errorMessage?: string;
 }
 
+export interface ExecuteResponse {
+  signature: string;
+  priorityFee: number;
+  priorityFeeUnit: string;
+  executionTimeMs: number;
+  inAmount: string;
+  outAmount: string;
+}
+
 export interface HealthResponse {
   status: string;
   payerWallet: string;
@@ -22,6 +31,22 @@ export interface HealthResponse {
     low: number;
     medium: number;
     high: number;
+  };
+}
+
+export interface FeesResponse {
+  priorityFees: {
+    low: number;
+    medium: number;
+    high: number;
+    veryHigh: number;
+  };
+  unit: string;
+  description: {
+    low: string;
+    medium: string;
+    high: string;
+    veryHigh: string;
   };
 }
 
@@ -40,7 +65,7 @@ export async function getQuote(intent: SwapIntent): Promise<JupiterOrderResponse
   return res.json();
 }
 
-export async function executeSwap(intent: SwapIntent): Promise<{ signature: string }> {
+export async function executeSwap(intent: SwapIntent): Promise<ExecuteResponse> {
   const res = await fetch(`${SOLVER_API_URL}/execute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -60,6 +85,16 @@ export async function getHealth(): Promise<HealthResponse> {
 
   if (!res.ok) {
     throw new Error("Failed to fetch health status");
+  }
+
+  return res.json();
+}
+
+export async function getFees(): Promise<FeesResponse> {
+  const res = await fetch(`${SOLVER_API_URL}/fees`);
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch fee data");
   }
 
   return res.json();

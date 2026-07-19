@@ -83,6 +83,7 @@ fn app(app_state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(health_check))
+        .route("/fees", get(fees_handler))
         .route("/solve", post(solve_handler))
         .route("/test_execute", post(test_execute_handler))
         .route("/execute", post(execute_handler))
@@ -120,6 +121,37 @@ async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>
     };
 
     (StatusCode::OK, Json(json!(response)))
+}
+
+async fn fees_handler(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    let low_fee = state.fee_estimator.get_priority_fee_for_level("low").await;
+    let medium_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("medium")
+        .await;
+    let high_fee = state.fee_estimator.get_priority_fee_for_level("high").await;
+    let very_high_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("very-high")
+        .await;
+
+    let response = json!({
+        "priority_fees": {
+            "low": low_fee,
+            "medium": medium_fee,
+            "high": high_fee,
+            "very_high": very_high_fee,
+        },
+        "unit": "micro_lamports_per_cu",
+        "description": {
+            "low": "Cheapest, may take longer to land",
+            "medium": "Balanced cost and speed",
+            "high": "Fast inclusion, recommended for most swaps",
+            "very_high": "Highest priority, fastest inclusion"
+        }
+    });
+
+    (StatusCode::OK, Json(response))
 }
 
 async fn solve_handler(
@@ -216,6 +248,8 @@ async fn execute_handler(
         "Processing /execute request"
     );
 
+    let start_time = std::time::Instant::now();
+
     let quote = solve_swap_intent_with_jupiter(&intent).await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get quote");
         (
@@ -257,10 +291,28 @@ async fn execute_handler(
         )
     })?;
 
+    let priority_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("high")
+        .await;
+
     match state.executor.execute_transaction(&tx).await {
         Ok(signature) => {
-            tracing::info!(signature = %signature, "Step 3/3: Execution successful");
-            Ok(Json(json!({ "signature": signature.to_string() })))
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+            tracing::info!(
+                signature = %signature,
+                elapsed_ms,
+                priority_fee,
+                "Step 3/3: Execution successful"
+            );
+            Ok(Json(json!({
+                "signature": signature.to_string(),
+                "priority_fee": priority_fee,
+                "priority_fee_unit": "micro_lamports_per_cu",
+                "execution_time_ms": elapsed_ms,
+                "in_amount": quote.in_amount,
+                "out_amount": quote.out_amount,
+            })))
         }
         Err(e) => {
             tracing::error!(error = %e, "Execution failed");

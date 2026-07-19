@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { getQuote, executeSwap, SwapIntent, JupiterOrderResponse } from "@/app/lib/api";
+import { getQuote, executeSwap, SwapIntent, JupiterOrderResponse, ExecuteResponse } from "@/app/lib/api";
 
 const TOKEN_OPTIONS = [
   { mint: "So11111111111111111111111111111111111111112", symbol: "SOL", decimals: 9 },
@@ -27,6 +27,7 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
   const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [execDetails, setExecDetails] = useState<ExecuteResponse | null>(null);
 
   const handleGetQuote = async () => {
     if (!publicKey || !amount || parseFloat(amount) <= 0) return;
@@ -72,6 +73,7 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
 
       const result = await executeSwap(intent);
       setTxSignature(result.signature);
+      setExecDetails(result);
       onSwapExecuted?.(result.signature);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to execute swap");
@@ -219,8 +221,24 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
 
       {/* Success */}
       {txSignature && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2 text-green-400 text-xs">
-          <div className="mb-1">Swap executed successfully!</div>
+        <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2 text-green-400 text-xs space-y-1">
+          <div className="font-medium">Swap executed successfully!</div>
+          {execDetails && (
+            <div className="flex flex-col gap-0.5 text-green-300/80">
+              <div className="flex justify-between">
+                <span>Priority Fee</span>
+                <span>{execDetails.priorityFee.toLocaleString()} {execDetails.priorityFeeUnit.replace("micro_lamports_per_cu", "μLam/CU")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Execution Time</span>
+                <span>{execDetails.executionTimeMs.toLocaleString()}ms</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Received</span>
+                <span>{(parseFloat(execDetails.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 6 : outputToken.decimals)} {outputToken.symbol}</span>
+              </div>
+            </div>
+          )}
           <a
             href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
             target="_blank"
