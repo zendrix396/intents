@@ -30,8 +30,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      # - name: Check formatting
-        # run: cargo fmt -- --check
+      - name: Check formatting
+        run: cargo fmt -- --check
 
       - name: Lint code
         run: cargo clippy --workspace -- -D warnings

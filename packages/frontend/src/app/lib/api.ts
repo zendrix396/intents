@@ -5,6 +5,7 @@ export interface SwapIntent {
   outputMint: string;
   amount: number;
   taker: string;
+  slippageBps?: number;
 }
 
 export interface JupiterOrderResponse {
@@ -19,6 +20,7 @@ export interface ExecuteResponse {
   priorityFee: number;
   priorityFeeUnit: string;
   executionTimeMs: number;
+  unitsConsumed?: number;
   inAmount: string;
   outAmount: string;
 }

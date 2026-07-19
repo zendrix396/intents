@@ -62,7 +62,10 @@ impl PayerManager {
             Ok(balance_lamports) => {
                 let balance_sol =
                     balance_lamports as f64 / solana_sdk::native_token::LAMPORTS_PER_SOL as f64;
-                tracing::info!(balance_sol = format!("{:.4}", balance_sol), "Payer wallet balance");
+                tracing::info!(
+                    balance_sol = format!("{:.4}", balance_sol),
+                    "Payer wallet balance"
+                );
 
                 if balance_sol < LOW_BALANCE_THRESHOLD_SOL {
                     tracing::warn!(

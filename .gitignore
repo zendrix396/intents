@@ -19,7 +19,6 @@ yarn-error.log*
 /packages/solver-service/target
 /packages/programs/*/target
 /target
-Cargo.lock
 
 # Python
 __pycache__/

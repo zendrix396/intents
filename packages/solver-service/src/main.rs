@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::Engine;
 use serde::Serialize;
 use serde_json::{json, Value};
 use solana_sdk::signature::Signer;
@@ -17,7 +18,6 @@ use solver_core::{
 };
 use std::env;
 use std::sync::Arc;
-use base64::Engine;
 use tower_http::cors::{Any, CorsLayer};
 
 mod payer_manager;
@@ -192,8 +192,7 @@ async fn test_execute_handler(
     let payer = state.payer_manager.get_keypair();
     let client = state.connection_manager.get_healthy_client().await;
 
-    let instruction =
-        system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000);
+    let instruction = system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000);
 
     let (blockhash, _) = client
         .get_latest_blockhash_with_commitment(client.commitment())
@@ -275,13 +274,15 @@ async fn execute_handler(
         )
     })?;
 
-    let tx_bytes = base64::engine::general_purpose::STANDARD.decode(tx_b64).map_err(|e| {
-        tracing::error!(error = %e, "Failed to decode transaction");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to decode transaction: {}", e),
-        )
-    })?;
+    let tx_bytes = base64::engine::general_purpose::STANDARD
+        .decode(tx_b64)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to decode transaction");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to decode transaction: {}", e),
+            )
+        })?;
 
     let tx: VersionedTransaction = bincode::deserialize(&tx_bytes).map_err(|e| {
         tracing::error!(error = %e, "Failed to deserialize transaction");
@@ -291,10 +292,43 @@ async fn execute_handler(
         )
     })?;
 
-    let priority_fee = state
-        .fee_estimator
-        .get_priority_fee_for_level("high")
-        .await;
+    // Pre-flight simulation
+    tracing::info!("Step 2/3: Running pre-flight simulation...");
+    let sim_result = state
+        .executor
+        .simulate_transaction(&tx)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Simulation RPC call failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Simulation failed: {}", e),
+            )
+        })?;
+
+    if !sim_result.success {
+        tracing::warn!(
+            error = ?sim_result.error,
+            units_consumed = sim_result.units_consumed,
+            "Transaction simulation failed, aborting execution"
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Transaction simulation failed: {}",
+                sim_result
+                    .error
+                    .unwrap_or_else(|| "unknown error".to_string())
+            ),
+        ));
+    }
+
+    let priority_fee = state.fee_estimator.get_priority_fee_for_level("high").await;
+
+    tracing::info!(
+        units_consumed = sim_result.units_consumed,
+        "Step 2/3: Simulation passed"
+    );
 
     match state.executor.execute_transaction(&tx).await {
         Ok(signature) => {
@@ -303,6 +337,7 @@ async fn execute_handler(
                 signature = %signature,
                 elapsed_ms,
                 priority_fee,
+                units_consumed = sim_result.units_consumed,
                 "Step 3/3: Execution successful"
             );
             Ok(Json(json!({
@@ -310,6 +345,7 @@ async fn execute_handler(
                 "priority_fee": priority_fee,
                 "priority_fee_unit": "micro_lamports_per_cu",
                 "execution_time_ms": elapsed_ms,
+                "units_consumed": sim_result.units_consumed,
                 "in_amount": quote.in_amount,
                 "out_amount": quote.out_amount,
             })))
@@ -332,8 +368,8 @@ mod tests {
         http::{Request, StatusCode},
     };
     use solana_sdk::signature::Signer;
-    use tower::ServiceExt;
     use std::env;
+    use tower::ServiceExt;
 
     fn setup_test_environment() -> (AppState, solana_sdk::signature::Keypair) {
         let mock_keypair = solana_sdk::signature::Keypair::new();

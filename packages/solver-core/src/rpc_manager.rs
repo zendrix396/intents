@@ -23,7 +23,10 @@ impl ConnectionManager {
 
         let health = Arc::new(Mutex::new(vec![true; clients.len()]));
 
-        tracing::info!("ConnectionManager initialized with {} RPC endpoints", clients.len());
+        tracing::info!(
+            "ConnectionManager initialized with {} RPC endpoints",
+            clients.len()
+        );
 
         Self {
             clients,

@@ -12,6 +12,13 @@ const TOKEN_OPTIONS = [
   { mint: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", symbol: "wSOL", decimals: 9 },
 ];
 
+const SLIPPAGE_OPTIONS = [
+  { value: 10, label: "0.1%" },
+  { value: 50, label: "0.5%" },
+  { value: 100, label: "1%" },
+  { value: 200, label: "2%" },
+];
+
 interface IntentFormProps {
   onQuoteReceived?: (quote: JupiterOrderResponse, intent: SwapIntent) => void;
   onSwapExecuted?: (signature: string) => void;
@@ -22,6 +29,7 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
   const [inputToken, setInputToken] = useState(TOKEN_OPTIONS[0]);
   const [outputToken, setOutputToken] = useState(TOKEN_OPTIONS[1]);
   const [amount, setAmount] = useState("");
+  const [slippageBps, setSlippageBps] = useState(50);
   const [quote, setQuote] = useState<JupiterOrderResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
@@ -44,6 +52,7 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
         outputMint: outputToken.mint,
         amount: rawAmount,
         taker: publicKey.toBase58(),
+        slippageBps,
       };
 
       const result = await getQuote(intent);
@@ -69,6 +78,7 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
         outputMint: outputToken.mint,
         amount: rawAmount,
         taker: publicKey.toBase58(),
+        slippageBps,
       };
 
       const result = await executeSwap(intent);
@@ -170,6 +180,26 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
         </div>
       </div>
 
+      {/* Slippage Tolerance */}
+      <div>
+        <label className="block text-white/60 text-xs mb-1.5">Slippage Tolerance</label>
+        <div className="flex gap-1.5">
+          {SLIPPAGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setSlippageBps(opt.value)}
+              className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                slippageBps === opt.value
+                  ? "bg-purple-600 text-white"
+                  : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Error */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-red-400 text-xs">
@@ -233,6 +263,12 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
                 <span>Execution Time</span>
                 <span>{execDetails.executionTimeMs.toLocaleString()}ms</span>
               </div>
+              {execDetails.unitsConsumed != null && (
+                <div className="flex justify-between">
+                  <span>Compute Units</span>
+                  <span>{execDetails.unitsConsumed.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Received</span>
                 <span>{(parseFloat(execDetails.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 6 : outputToken.decimals)} {outputToken.symbol}</span>

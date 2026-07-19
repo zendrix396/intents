@@ -1,11 +1,16 @@
 use crate::rpc_manager::ConnectionManager;
 use crate::SolverError;
-use solana_sdk::{
-    signature::Signature,
-    transaction::VersionedTransaction,
-};
+use solana_sdk::{signature::Signature, transaction::VersionedTransaction};
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Result of a transaction simulation.
+#[derive(Debug, Clone)]
+pub struct SimulationResult {
+    pub success: bool,
+    pub units_consumed: u64,
+    pub error: Option<String>,
+}
 
 const MAX_RETRIES: u32 = 3;
 const BASE_RETRY_DELAY_MS: u64 = 1000;
@@ -19,6 +24,50 @@ pub struct TransactionExecutor {
 impl TransactionExecutor {
     pub fn new(connection_manager: Arc<ConnectionManager>) -> Self {
         Self { connection_manager }
+    }
+
+    /// Simulates a transaction without sending it, returning compute units consumed and errors.
+    pub async fn simulate_transaction(
+        &self,
+        transaction: &VersionedTransaction,
+    ) -> Result<SimulationResult, SolverError> {
+        let client = self.connection_manager.get_healthy_client().await;
+
+        tracing::info!("Simulating transaction as pre-flight check...");
+
+        match client.simulate_transaction(transaction).await {
+            Ok(response) => {
+                let sim = response.value;
+                let units = sim.units_consumed.unwrap_or(0);
+                if let Some(err) = sim.err {
+                    let err_str = format!("{:?}", err);
+                    tracing::warn!(
+                        error = %err_str,
+                        units_consumed = units,
+                        "Transaction simulation failed"
+                    );
+                    return Ok(SimulationResult {
+                        success: false,
+                        units_consumed: units,
+                        error: Some(err_str),
+                    });
+                }
+
+                tracing::info!(units_consumed = units, "Transaction simulation passed");
+                Ok(SimulationResult {
+                    success: true,
+                    units_consumed: units,
+                    error: None,
+                })
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to simulate transaction");
+                Err(SolverError::TransactionExecutionFailed(format!(
+                    "Simulation RPC call failed: {}",
+                    e
+                )))
+            }
+        }
     }
 
     /// Sends and confirms a transaction with retry logic.
@@ -43,10 +92,7 @@ impl TransactionExecutor {
 
             let client = self.connection_manager.get_healthy_client().await;
 
-            tracing::info!(
-                attempt,
-                "Sending transaction..."
-            );
+            tracing::info!(attempt, "Sending transaction...");
 
             match client.send_and_confirm_transaction(transaction).await {
                 Ok(signature) => {
