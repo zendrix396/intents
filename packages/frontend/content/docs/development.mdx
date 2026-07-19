@@ -1,0 +1,148 @@
+---
+title: Development
+description: Setting up the project for local development
+order: 4
+---
+
+# Development Guide
+
+## Project Structure
+
+```
+intents/
+├── Cargo.toml              # Rust workspace root
+├── packages/
+│   ├── solver-core/        # Core solver library (Rust)
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── swapper.rs
+│   │       ├── executor.rs
+│   │       ├── fee_estimator.rs
+│   │       ├── rpc_manager.rs
+│   │       └── error.rs
+│   ├── solver-service/     # HTTP API server (Rust)
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── main.rs
+│   │       └── payer_manager.rs
+│   └── frontend/           # Web UI (Next.js)
+│       ├── package.json
+│       ├── next.config.ts
+│       └── src/
+│           ├── app/
+│           │   ├── page.tsx
+│           │   ├── layout.tsx
+│           │   └── lib/
+│           └── components/
+├── docs/                   # Documentation source
+└── .github/workflows/      # CI configuration
+```
+
+## Prerequisites
+
+- **Rust** (stable, with clippy and rustfmt)
+- **Node.js** 18+
+- **Solana CLI** (for wallet management)
+- A Solana RPC endpoint (Helius, QuickNode, or public devnet)
+
+## Backend Setup
+
+### 1. Clone and Build
+
+```bash
+git clone https://github.com/zendrix396/intents.git
+cd intents
+cargo build --workspace
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your RPC_URL and wallet key
+```
+
+### 3. Run Tests
+
+```bash
+cargo test --workspace
+cargo clippy --workspace -- -D warnings
+```
+
+### 4. Start the Service
+
+```bash
+cd packages/solver-service
+cargo run
+```
+
+The server starts on `http://localhost:3000` by default.
+
+## Frontend Setup
+
+### 1. Install Dependencies
+
+```bash
+cd packages/frontend
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env.local
+# Set NEXT_PUBLIC_SOLVER_API_URL if not localhost:3000
+```
+
+### 3. Start Dev Server
+
+```bash
+npm run dev
+```
+
+The frontend starts on `http://localhost:3001`.
+
+## Testing
+
+### Rust
+
+```bash
+# Run all tests
+cargo test --workspace
+
+# Run with output
+cargo test --workspace -- --nocapture
+
+# Run specific test
+cargo test test_calculate_percentile
+
+# Run ignored tests (integration tests)
+cargo test --workspace -- --ignored
+```
+
+### Frontend
+
+No test framework is currently configured. Consider adding Vitest for unit tests and Playwright for E2E tests.
+
+## CI Pipeline
+
+GitHub Actions runs on every push to `main`:
+
+1. **Rust CI**: `cargo clippy`, `cargo build`, `cargo test`
+2. Caching via `Swatinem/rust-cache`
+
+To add frontend CI, create a new job in `.github/workflows/ci.yml`.
+
+## Code Style
+
+### Rust
+- Follow standard `rustfmt` formatting
+- Use `clippy` warnings as errors
+- Prefer `thiserror` for library errors, `anyhow` for application errors
+- Use `tracing` for structured logging
+
+### TypeScript
+- ESLint with `next/core-web-vitals` and `next/typescript`
+- Tailwind CSS for styling (v4 with CSS-first config)
+- Functional components with hooks

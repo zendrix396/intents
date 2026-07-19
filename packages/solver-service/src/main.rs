@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::Engine;
 use serde::Serialize;
 use serde_json::{json, Value};
 use solana_sdk::signature::Signer;
@@ -17,7 +18,7 @@ use solver_core::{
 };
 use std::env;
 use std::sync::Arc;
-use base64::Engine; // for base64 decode Engine API
+use tower_http::cors::{Any, CorsLayer};
 
 mod payer_manager;
 use payer_manager::PayerManager;
@@ -27,38 +28,40 @@ struct AppState {
     connection_manager: Arc<ConnectionManager>,
     fee_estimator: Arc<FeeEstimator>,
     payer_manager: Arc<PayerManager>,
-    executor: Arc<TransactionExecutor>, // New field
+    executor: Arc<TransactionExecutor>,
 }
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    println!("Starting Solana Intent Solver Service...");
+
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    tracing::info!("Starting Solana Intent Solver Service...");
 
     let rpc_url = env::var("RPC_URL").expect("FATAL: RPC_URL environment variable not set.");
     let rpc_urls = vec![rpc_url];
-    println!("[RPC Manager] Using endpoint: {}", rpc_urls[0]);
+    tracing::info!(endpoint = %rpc_urls[0], "Using RPC endpoint");
 
-    // 1. Create the Arc for the ConnectionManager ONCE.
     let connection_manager = Arc::new(ConnectionManager::new(rpc_urls));
-    
-    // 2. Start the health checker on the original Arc.
     connection_manager.start_health_checker();
 
-    // 3. Create other components by CLONING the Arc.
-    //    Cloning an Arc is cheap; it just bumps a reference counter.
     let fee_estimator = Arc::new(FeeEstimator::new(connection_manager.clone()));
     fee_estimator.start_fee_monitor();
 
     let payer_manager = Arc::new(PayerManager::from_env(connection_manager.clone()));
     payer_manager.start_balance_monitor();
-    
+
     let executor = Arc::new(TransactionExecutor::new(connection_manager.clone()));
 
-    // 4. NOW, create the AppState. This will MOVE the final ownership of the
-    //    original `connection_manager` Arc and the other Arcs into the state.
     let app_state = AppState {
-        connection_manager, // The original is moved here.
+        connection_manager,
         fee_estimator,
         payer_manager,
         executor,
@@ -66,19 +69,25 @@ async fn main() {
 
     let app = app(app_state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Listening on http://0.0.0.0:3000");
+    let bind_addr = env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:3000".to_string());
+    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
+    tracing::info!(addr = %bind_addr, "Server listening");
     axum::serve(listener, app).await.unwrap();
 }
 
-/// Creates the Axum application router with shared state.
 fn app(app_state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(health_check))
+        .route("/fees", get(fees_handler))
         .route("/solve", post(solve_handler))
-        // Add a new route to test the executor
         .route("/test_execute", post(test_execute_handler))
         .route("/execute", post(execute_handler))
+        .layer(cors)
         .with_state(app_state)
 }
 
@@ -114,16 +123,60 @@ async fn health_check(State(state): State<AppState>) -> (StatusCode, Json<Value>
     (StatusCode::OK, Json(json!(response)))
 }
 
+async fn fees_handler(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    let low_fee = state.fee_estimator.get_priority_fee_for_level("low").await;
+    let medium_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("medium")
+        .await;
+    let high_fee = state.fee_estimator.get_priority_fee_for_level("high").await;
+    let very_high_fee = state
+        .fee_estimator
+        .get_priority_fee_for_level("very-high")
+        .await;
+
+    let response = json!({
+        "priority_fees": {
+            "low": low_fee,
+            "medium": medium_fee,
+            "high": high_fee,
+            "very_high": very_high_fee,
+        },
+        "unit": "micro_lamports_per_cu",
+        "description": {
+            "low": "Cheapest, may take longer to land",
+            "medium": "Balanced cost and speed",
+            "high": "Fast inclusion, recommended for most swaps",
+            "very_high": "Highest priority, fastest inclusion"
+        }
+    });
+
+    (StatusCode::OK, Json(response))
+}
+
 async fn solve_handler(
     State(_state): State<AppState>,
     Json(intent): Json<SwapIntent>,
 ) -> Result<Json<JupiterOrderResponse>, (StatusCode, String)> {
-    println!("[API] Received solve request: {intent:?}");
+    if let Err(e) = intent.validate() {
+        tracing::warn!(error = %e, "Invalid solve request");
+        return Err((StatusCode::BAD_REQUEST, e));
+    }
+
+    tracing::info!(
+        input = %intent.input_mint,
+        output = %intent.output_mint,
+        amount = intent.amount,
+        "Processing solve request"
+    );
 
     match solve_swap_intent_with_jupiter(&intent).await {
-        Ok(order) => Ok(Json(order)),
+        Ok(order) => {
+            tracing::info!("Successfully got quote from Jupiter");
+            Ok(Json(order))
+        }
         Err(e) => {
-            println!("[API] Error solving intent: {e}");
+            tracing::error!(error = %e, "Failed to solve intent");
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to get order from Jupiter: {e}"),
@@ -132,48 +185,45 @@ async fn solve_handler(
     }
 }
 
-/// A simple handler to test our TransactionExecutor.
-/// It creates and executes a transaction that sends 0.001 SOL to itself.
 async fn test_execute_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    println!("[API] Received /test_execute request");
+    tracing::info!("Processing /test_execute request");
     let payer = state.payer_manager.get_keypair();
     let client = state.connection_manager.get_healthy_client().await;
 
-    // 1. Create the instruction.
-    let instruction =
-        system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000); // 0.001 SOL
+    let instruction = system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000);
 
-    // 2. Get a recent blockhash. This is required for signing.
     let (blockhash, _) = client
         .get_latest_blockhash_with_commitment(client.commitment())
         .await
         .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get blockhash");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Failed to get blockhash: {}", e),
             )
         })?;
 
-    // 3. Build the message with the blockhash.
     let message = solana_sdk::message::VersionedMessage::Legacy(Message::new_with_blockhash(
         &[instruction],
         Some(&payer.pubkey()),
         &blockhash,
     ));
 
-    // 4. Create AND SIGN the transaction in a single step using try_new.
     let tx = VersionedTransaction::try_new(message, &[payer]).map_err(|e| {
+        tracing::error!(error = %e, "Failed to sign transaction");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to sign transaction: {}", e),
         )
-    })?; // The '?' handles the Result
+    })?;
 
-    // 5. Pass the now-signed transaction to the executor to send and confirm.
     match state.executor.execute_transaction(&tx).await {
-        Ok(signature) => Ok(Json(json!({ "signature": signature.to_string() }))),
+        Ok(signature) => {
+            tracing::info!(signature = %signature, "Test execute successful");
+            Ok(Json(json!({ "signature": signature.to_string() })))
+        }
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Execution failed: {}", e),
@@ -185,10 +235,22 @@ async fn execute_handler(
     State(state): State<AppState>,
     Json(intent): Json<SwapIntent>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
-    println!("[API] Received /execute request for intent: {:?}", intent);
+    if let Err(e) = intent.validate() {
+        tracing::warn!(error = %e, "Invalid execute request");
+        return Err((StatusCode::BAD_REQUEST, e));
+    }
 
-    // 1) Get quote/order from Jupiter
+    tracing::info!(
+        input = %intent.input_mint,
+        output = %intent.output_mint,
+        amount = intent.amount,
+        "Processing /execute request"
+    );
+
+    let start_time = std::time::Instant::now();
+
     let quote = solve_swap_intent_with_jupiter(&intent).await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get quote");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to get quote: {}", e),
@@ -196,15 +258,15 @@ async fn execute_handler(
     })?;
 
     if let Some(err) = &quote.error_message {
+        tracing::warn!(error = %err, "Jupiter returned error");
         return Err((
             StatusCode::BAD_REQUEST,
             format!("Jupiter returned error: {}", err),
         ));
     }
 
-    println!("[API] Step 1/3: Got quote successfully.");
+    tracing::info!("Step 1/3: Got quote successfully");
 
-    // 2) Extract the transaction string returned by Jupiter (if present)
     let tx_b64 = quote.transaction.as_ref().ok_or_else(|| {
         (
             StatusCode::BAD_REQUEST,
@@ -212,31 +274,89 @@ async fn execute_handler(
         )
     })?;
 
-    // 3) Decode and deserialize the VersionedTransaction
-    let tx_bytes = base64::engine::general_purpose::STANDARD.decode(tx_b64).map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to decode transaction: {}", e),
-        )
-    })?;
+    let tx_bytes = base64::engine::general_purpose::STANDARD
+        .decode(tx_b64)
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to decode transaction");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to decode transaction: {}", e),
+            )
+        })?;
 
     let tx: VersionedTransaction = bincode::deserialize(&tx_bytes).map_err(|e| {
+        tracing::error!(error = %e, "Failed to deserialize transaction");
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to deserialize transaction: {}", e),
         )
     })?;
 
-    // 4) Execute it
+    // Pre-flight simulation
+    tracing::info!("Step 2/3: Running pre-flight simulation...");
+    let sim_result = state
+        .executor
+        .simulate_transaction(&tx)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Simulation RPC call failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Simulation failed: {}", e),
+            )
+        })?;
+
+    if !sim_result.success {
+        tracing::warn!(
+            error = ?sim_result.error,
+            units_consumed = sim_result.units_consumed,
+            "Transaction simulation failed, aborting execution"
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Transaction simulation failed: {}",
+                sim_result
+                    .error
+                    .unwrap_or_else(|| "unknown error".to_string())
+            ),
+        ));
+    }
+
+    let priority_fee = state.fee_estimator.get_priority_fee_for_level("high").await;
+
+    tracing::info!(
+        units_consumed = sim_result.units_consumed,
+        "Step 2/3: Simulation passed"
+    );
+
     match state.executor.execute_transaction(&tx).await {
         Ok(signature) => {
-            println!("[API] Step 3/3: Execution successful!");
-            Ok(Json(json!({ "signature": signature.to_string() })))
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+            tracing::info!(
+                signature = %signature,
+                elapsed_ms,
+                priority_fee,
+                units_consumed = sim_result.units_consumed,
+                "Step 3/3: Execution successful"
+            );
+            Ok(Json(json!({
+                "signature": signature.to_string(),
+                "priority_fee": priority_fee,
+                "priority_fee_unit": "micro_lamports_per_cu",
+                "execution_time_ms": elapsed_ms,
+                "units_consumed": sim_result.units_consumed,
+                "in_amount": quote.in_amount,
+                "out_amount": quote.out_amount,
+            })))
         }
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Execution failed: {}", e),
-        )),
+        Err(e) => {
+            tracing::error!(error = %e, "Execution failed");
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Execution failed: {}", e),
+            ))
+        }
     }
 }
 
@@ -248,8 +368,8 @@ mod tests {
         http::{Request, StatusCode},
     };
     use solana_sdk::signature::Signer;
-    use tower::ServiceExt;
     use std::env;
+    use tower::ServiceExt;
 
     fn setup_test_environment() -> (AppState, solana_sdk::signature::Keypair) {
         let mock_keypair = solana_sdk::signature::Keypair::new();
@@ -274,6 +394,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_health_check() {
         let (app_state, mock_keypair) = setup_test_environment();
         let expected_pubkey = mock_keypair.pubkey().to_string();
@@ -298,17 +419,112 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // This test requires internet access.
+    #[serial_test::serial]
+    async fn test_solve_validation_empty_input_mint() {
+        let (app_state, _) = setup_test_environment();
+        let app = app(app_state);
+
+        let payload = json!({
+            "inputMint": "",
+            "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "amount": 100000000,
+            "taker": "jdocuPgEAjMfihABsPgKEvYtsmMzjUHeq9LX4Hvs7f3"
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/solve")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_solve_validation_same_tokens() {
+        let (app_state, _) = setup_test_environment();
+        let app = app(app_state);
+
+        let payload = json!({
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "outputMint": "So11111111111111111111111111111111111111112",
+            "amount": 100000000,
+            "taker": "jdocuPgEAjMfihABsPgKEvYtsmMzjUHeq9LX4Hvs7f3"
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/solve")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_solve_validation_zero_amount() {
+        let (app_state, _) = setup_test_environment();
+        let app = app(app_state);
+
+        let payload = json!({
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "amount": 0,
+            "taker": "jdocuPgEAjMfihABsPgKEvYtsmMzjUHeq9LX4Hvs7f3"
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/solve")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_solve_validation_invalid_taker() {
+        let (app_state, _) = setup_test_environment();
+        let app = app(app_state);
+
+        let payload = json!({
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "amount": 100000000,
+            "taker": "short"
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/solve")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    #[ignore]
     async fn test_solve_endpoint_integration() {
         let (app_state, _) = setup_test_environment();
         let app = app(app_state);
 
-        // A real swap intent: 0.1 SOL to USDC, with a taker address.
         let payload = json!({
             "inputMint": "So11111111111111111111111111111111111111112",
             "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-            "amount": 100000000, // 0.1 SOL
-            // We can use a real address here. The API doesn't check if the taker has funds, only that it's a valid pubkey.
+            "amount": 100000000,
             "taker": "jdocuPgEAjMfihABsPgKEvYtsmMzjUHeq9LX4Hvs7f3"
         });
 
@@ -328,12 +544,8 @@ mod tests {
 
         let order: JupiterOrderResponse = serde_json::from_slice(&body).unwrap();
 
-        // The API call is successful even if it returns an error message in the JSON.
-        // This is a great test because it proves we are correctly communicating with the API.
         assert!(order.error_message.is_some());
         assert_eq!(order.error_message.unwrap(), "Insufficient funds");
-
-        // We still get quote data back, which is what we care about.
         assert!(order.out_amount.parse::<u64>().unwrap() > 0);
     }
 }

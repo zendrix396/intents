@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,44 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* MDX prose overrides for dark theme */
+.prose {
+  --tw-prose-body: rgba(255, 255, 255, 0.7);
+  --tw-prose-headings: rgba(255, 255, 255, 0.95);
+  --tw-prose-links: #a78bfa;
+  --tw-prose-bold: rgba(255, 255, 255, 0.9);
+  --tw-prose-counters: rgba(255, 255, 255, 0.5);
+  --tw-prose-bullets: rgba(255, 255, 255, 0.5);
+  --tw-prose-hr: rgba(255, 255, 255, 0.1);
+  --tw-prose-quotes: rgba(255, 255, 255, 0.8);
+  --tw-prose-quote-borders: rgba(167, 139, 250, 0.4);
+  --tw-prose-captions: rgba(255, 255, 255, 0.5);
+  --tw-prose-code: rgba(255, 255, 255, 0.85);
+  --tw-prose-pre-code: rgba(255, 255, 255, 0.8);
+  --tw-prose-pre-bg: rgba(255, 255, 255, 0.05);
+  --tw-prose-th-borders: rgba(255, 255, 255, 0.15);
+  --tw-prose-td-borders: rgba(255, 255, 255, 0.08);
+}
+
+.prose pre {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+}
+
+.prose code:not(pre code) {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose table {
+  border-collapse: collapse;
+}
+
+.prose th, .prose td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
 }

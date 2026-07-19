@@ -23,7 +23,7 @@ impl FeeEstimator {
 
             loop {
                 interval.tick().await;
-                println!("[Fee Monitor] Fetching recent priority fees...");
+                tracing::info!("Fetching recent priority fees...");
                 self_clone.fetch_and_update_fees().await;
             }
         });
@@ -39,7 +39,7 @@ impl FeeEstimator {
                 .map(|fee| fee.prioritization_fee)
                 .collect(),
             Err(e) => {
-                eprintln!("[Fee Monitor] Failed to fetch fees: {e}");
+                tracing::warn!("Failed to fetch fees: {}", e);
                 vec![]
             }
         };
@@ -47,7 +47,7 @@ impl FeeEstimator {
         if !recent_fees.is_empty() {
             let mut fees_lock = self.recent_fees.lock().await;
             *fees_lock = recent_fees;
-            println!("[Fee Monitor] Updated fees cache.");
+            tracing::debug!("Updated fees cache with {} entries", fees_lock.len());
         }
     }
 
@@ -78,4 +78,78 @@ fn calculate_percentile(sorted_data: &[u64], percentile: f64) -> u64 {
     }
     let index = (percentile * (sorted_data.len() - 1) as f64).round() as usize;
     sorted_data[index]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_percentile_empty() {
+        assert_eq!(calculate_percentile(&[], 0.5), 0);
+    }
+
+    #[test]
+    fn test_calculate_percentile_single() {
+        assert_eq!(calculate_percentile(&[10], 0.5), 10);
+    }
+
+    #[test]
+    fn test_calculate_percentile_low() {
+        let data = vec![10, 20, 30, 40, 50];
+        assert_eq!(calculate_percentile(&data, 0.25), 20);
+    }
+
+    #[test]
+    fn test_calculate_percentile_medium() {
+        let data = vec![10, 20, 30, 40, 50];
+        assert_eq!(calculate_percentile(&data, 0.50), 30);
+    }
+
+    #[test]
+    fn test_calculate_percentile_high() {
+        let data = vec![10, 20, 30, 40, 50];
+        assert_eq!(calculate_percentile(&data, 0.75), 40);
+    }
+
+    #[test]
+    fn test_calculate_percentile_very_high() {
+        let data = vec![10, 20, 30, 40, 50];
+        assert_eq!(calculate_percentile(&data, 0.95), 50);
+    }
+
+    #[test]
+    fn test_calculate_percentile_two_elements() {
+        let data = vec![100, 200];
+        // index = (0.0 * 1).round() = 0 -> 100
+        assert_eq!(calculate_percentile(&data, 0.0), 100);
+        // index = (0.5 * 1).round() = 1 (rounds up) -> 200
+        assert_eq!(calculate_percentile(&data, 0.5), 200);
+        // index = (1.0 * 1).round() = 1 -> 200
+        assert_eq!(calculate_percentile(&data, 1.0), 200);
+    }
+
+    #[test]
+    fn test_calculate_percentile_unsorted_input() {
+        let data = vec![50, 10, 30, 20, 40];
+        let mut sorted = data.clone();
+        sorted.sort_unstable();
+        assert_eq!(calculate_percentile(&sorted, 0.5), 30);
+    }
+
+    #[test]
+    fn test_get_priority_fee_level_mapping() {
+        let data = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        let mut sorted = data;
+        sorted.sort_unstable();
+
+        // index = (0.25 * 9).round() = 2 -> 30
+        assert_eq!(calculate_percentile(&sorted, 0.25), 30);
+        // index = (0.50 * 9).round() = 5 -> 60
+        assert_eq!(calculate_percentile(&sorted, 0.50), 60);
+        // index = (0.75 * 9).round() = 7 -> 80
+        assert_eq!(calculate_percentile(&sorted, 0.75), 80);
+        // index = (0.95 * 9).round() = 9 -> 100
+        assert_eq!(calculate_percentile(&sorted, 0.95), 100);
+    }
 }

@@ -6,5 +6,5 @@ pub mod swapper;
 
 // Re-export the key components so solver-service can use them easily.
 pub use error::SolverError;
-pub use executor::TransactionExecutor;
+pub use executor::{SimulationResult, TransactionExecutor};
 pub use swapper::{solve_swap_intent_with_jupiter, JupiterOrderResponse, SwapIntent};
