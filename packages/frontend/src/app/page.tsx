@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { IntentForm } from "@/components/IntentForm";
+import { NetworkStatus } from "@/components/NetworkStatus";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -71,6 +72,9 @@ export default function Home() {
                     {loading ? "..." : `${balance?.toFixed(4) ?? "0.0000"} SOL`}
                   </div>
                 </div>
+
+                {/* Network Status */}
+                <NetworkStatus />
 
                 {/* Intent Form */}
                 <IntentForm />

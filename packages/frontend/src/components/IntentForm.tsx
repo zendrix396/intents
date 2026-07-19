@@ -223,8 +223,18 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
             </span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-white/50">Price Impact</span>
-            <span className="text-green-400">{"< 0.1%"}</span>
+            <span className="text-white/50">Min Received</span>
+            <span className="text-green-400">
+              {formatAmount(
+                String(Math.floor(parseFloat(quote.outAmount) * (1 - slippageBps / 10000))),
+                outputToken.decimals
+              )}{" "}
+              {outputToken.symbol}
+            </span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-white/50">Slippage</span>
+            <span className="text-white/70">{slippageBps / 100}%</span>
           </div>
         </div>
       )}

@@ -1,0 +1,25 @@
+services:
+  solver-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - RUST_LOG=info
+      - BIND_ADDR=0.0.0.0:3000
+      - RPC_URL=https://api.devnet.solana.com
+      - PRIVATE_KEY=${PRIVATE_KEY}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: packages/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_SOLVER_API_URL=http://solver-service:3000
+    depends_on:
+      - solver-service
+    restart: unless-stopped
