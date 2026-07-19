@@ -1,0 +1,162 @@
+---
+title: API Reference
+description: Full documentation for the solver-service REST API
+order: 3
+---
+
+# API Reference
+
+The solver-service exposes a REST API for interacting with the intent solver. All endpoints accept and return JSON.
+
+## Base URL
+
+```
+http://localhost:3000
+```
+
+Configure via the `BIND_ADDR` environment variable or defaults to `0.0.0.0:3000`.
+
+---
+
+## `GET /health`
+
+Returns the health status of the solver service, including RPC endpoint status and current priority fees.
+
+### Response
+
+```json
+{
+  "status": "ok",
+  "payerWallet": "AbC123...",
+  "rpcEndpoints": [
+    {
+      "endpoint": "https://api.devnet.solana.com",
+      "healthy": true,
+      "latency_ms": 45
+    }
+  ],
+  "priorityFees": {
+    "low": 1000,
+    "medium": 5000,
+    "high": 10000
+  }
+}
+```
+
+### Example
+
+```bash
+curl http://localhost:3000/health
+```
+
+---
+
+## `POST /solve`
+
+Get a swap quote by submitting an intent. The solver queries Jupiter's Ultra API for the best route.
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `inputMint` | string | Yes | Mint address of the token to sell |
+| `outputMint` | string | Yes | Mint address of the token to buy |
+| `amount` | number | Yes | Amount in smallest unit (lamports for SOL) |
+| `taker` | string | Yes | Wallet address of the user |
+
+### Response
+
+```json
+{
+  "inAmount": "1000000000",
+  "outAmount": "150000000",
+  "transaction": "base64-encoded-tx..."
+}
+```
+
+### Error Responses
+
+| Status | Condition |
+|--------|-----------|
+| 400 | Missing or invalid fields (empty mint, same tokens, zero amount, invalid pubkey) |
+| 500 | Jupiter API failure or network error |
+
+### Example
+
+```bash
+curl -X POST http://localhost:3000/solve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputMint": "So11111111111111111111111111111111111111112",
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "amount": 1000000000,
+    "taker": "YourWalletAddressHere"
+  }'
+```
+
+---
+
+## `POST /execute`
+
+Execute a swap by getting a quote from Jupiter, decoding the transaction, signing it with the payer wallet, and submitting it to Solana.
+
+### Request Body
+
+Same as `/solve`:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `inputMint` | string | Yes | Mint address of the token to sell |
+| `outputMint` | string | Yes | Mint address of the token to buy |
+| `amount` | number | Yes | Amount in smallest unit |
+| `taker` | string | Yes | Wallet address of the user |
+
+### Response
+
+```json
+{
+  "signature": "5JcK7...TxSig"
+}
+```
+
+### Error Responses
+
+| Status | Condition |
+|--------|-----------|
+| 400 | Invalid request fields |
+| 500 | Transaction failed or Jupiter API error |
+
+---
+
+## `POST /test_execute`
+
+Send a small test transaction (0.001 SOL self-transfer) to verify the payer wallet is configured correctly.
+
+### Response
+
+```json
+{
+  "signature": "5JcK7...TxSig"
+}
+```
+
+---
+
+## CORS
+
+The API allows cross-origin requests from any origin. This is configured via `tower-http` CORS middleware. In production, you should restrict this to your frontend domain.
+
+## Error Handling
+
+All endpoints return descriptive error messages. Validation errors include the specific field that failed. Server errors include context about what went wrong.
+
+## Priority Fees
+
+The solver automatically includes priority fees based on network conditions. The fee levels are:
+
+| Level | Percentile | Use Case |
+|-------|-----------|----------|
+| Low | 25th | Non-urgent transactions |
+| Medium | 50th | Standard swaps (default) |
+| High | 75th | Time-sensitive trades |
+| Very High | 95th | Competitive MEV protection |

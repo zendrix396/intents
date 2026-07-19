@@ -1,0 +1,75 @@
+---
+title: Architecture
+description: How the Solana Intents system is structured
+order: 2
+---
+
+# Architecture
+
+This is how the project is structured. The main idea is to keep things clean and separated so we can build without breaking stuff.
+
+## The Basic Flow
+
+The user's intent goes from the frontend to the backend, which figures out the best way to make it happen on Solana.
+
+```
+User's Intent (Frontend)
+      |
+      v
+API Endpoint (Solver Service)
+      |
+      v
+The Actual Logic (Solver Core)
+      |
+      v
+Solana Network
+```
+
+## The Pieces
+
+The project lives in a monorepo under the `packages/` directory.
+
+### `packages/solver-core` — The Brain
+
+A Rust library containing all the logic for figuring out intents. It knows nothing about web servers, making it easy to test in isolation.
+
+**Key modules:**
+- `swapper` — Intent validation and Jupiter API integration
+- `executor` — Transaction signing and submission
+- `fee_estimator` — Dynamic priority fee calculation
+- `rpc_manager` — Multi-endpoint RPC health checking with failover
+
+### `packages/solver-service` — The Server
+
+A lightweight Rust binary that runs the solver-core. It starts an Axum web server, exposes API endpoints, and handles web requests.
+
+**Endpoints:**
+- `GET /health` — System health check with RPC status
+- `POST /solve` — Get a swap quote
+- `POST /execute` — Execute a swap transaction
+- `POST /test_execute` — Test transaction (self-transfer)
+
+### `packages/frontend` — The UI
+
+A Next.js app where users connect their wallet and express their intents through a simple form. Talks to the solver-service API.
+
+## Why It's Set Up This Way
+
+### Core vs. Service Pattern
+
+The `solver-core` library is where the thinking happens. The `solver-service` just runs it. This is the most important pattern — it means we can write unit tests for the hard parts without spinning up a server.
+
+### Off-Chain First
+
+All the heavy lifting (finding the best route, simulations, etc.) happens off-chain in our Rust code. On-chain programs should be simple and just execute what they're told.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend Core | Rust, Tokio, Solana SDK |
+| API Server | Axum, tower-http (CORS) |
+| Frontend | Next.js 15, React 19, Tailwind CSS v4 |
+| Wallet | Solana Wallet Adapter (Phantom, Solflare) |
+| DEX Aggregation | Jupiter Ultra API |
+| CI/CD | GitHub Actions |

@@ -1,0 +1,66 @@
+---
+title: Getting Started
+description: Quick start guide for the Solana Intents platform
+order: 1
+---
+
+# Getting Started
+
+Welcome to **Solana Intents** — an intent-centric execution layer for Solana. Instead of telling the blockchain exactly what to do, you simply state your goal and our solver finds the best way to make it happen.
+
+## Prerequisites
+
+- A Solana wallet (Phantom or Solflare)
+- SOL for transaction fees on devnet
+- Node.js 18+ (for local development)
+
+## Quick Start
+
+### 1. Connect Your Wallet
+
+Visit the app and click **Connect Wallet** in the top-right corner. Select Phantom or Solflare.
+
+### 2. Select Tokens
+
+Choose which token you want to swap from and which token you want to receive. Supported tokens:
+
+| Token | Mint Address |
+|-------|-------------|
+| SOL | `So11111111111111111111111111111111111111112` |
+| USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+| USDT | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB` |
+| mSOL | `mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So` |
+| wSOL | `7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs` |
+
+### 3. Enter Amount
+
+Type the amount of the input token you want to swap.
+
+### 4. Get a Quote
+
+Click **Get Quote** to fetch the best rate from Jupiter's aggregation engine. The solver will find the optimal routing across multiple DEXs.
+
+### 5. Execute
+
+Review the quote details (exchange rate, price impact) and click **Execute Swap** to submit the transaction.
+
+## API Usage
+
+You can also interact with the solver directly via the REST API:
+
+```bash
+# Get a swap quote
+curl -X POST http://localhost:3000/solve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputMint": "So11111111111111111111111111111111111111112",
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "amount": 1000000000,
+    "taker": "YOUR_WALLET_ADDRESS"
+  }'
+```
+
+## What's Next?
+
+- Read the [Architecture](/docs/architecture) guide to understand how the system works
+- Check out the [API Reference](/docs/api-reference) for full endpoint documentation
