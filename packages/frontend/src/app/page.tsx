@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { IntentForm } from "@/components/IntentForm";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -34,8 +35,8 @@ export default function Home() {
     };
   }, [connection, publicKey]);
   return (
-    <div>
-      <div className="min-h-screen w-full relative bg-black text-white">
+    <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen w-full relative bg-black text-white flex-1">
         {/* background effect */}
         <div
           className="absolute inset-0 z-0"
@@ -106,6 +107,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

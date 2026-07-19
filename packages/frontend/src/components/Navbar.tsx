@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const WalletMultiButton = dynamic(
@@ -9,13 +10,16 @@ const WalletMultiButton = dynamic(
 );
 
 export function Navbar() {
+    const pathname = usePathname();
+    const isDocs = pathname.startsWith("/docs");
+
     return (
         <nav className="w-full px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-6">
-                <Link href="/" className="text-white/90 hover:text-white transition-colors">
+                <Link href="/" className={`hover:text-white transition-colors ${!isDocs ? "text-white/90" : "text-white/50"}`}>
                     <span className="text-lg font-semibold tracking-tight">Intent</span>
                 </Link>
-                <Link href="/docs" className="text-white/50 hover:text-white text-sm transition-colors">
+                <Link href="/docs" className={`hover:text-white transition-colors text-sm ${isDocs ? "text-white/90" : "text-white/50"}`}>
                     Docs
                 </Link>
             </div>
