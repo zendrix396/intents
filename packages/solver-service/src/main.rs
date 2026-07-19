@@ -17,7 +17,8 @@ use solver_core::{
 };
 use std::env;
 use std::sync::Arc;
-use base64::Engine; // for base64 decode Engine API
+use base64::Engine;
+use tower_http::cors::{Any, CorsLayer};
 
 mod payer_manager;
 use payer_manager::PayerManager;
@@ -73,12 +74,17 @@ async fn main() {
 
 /// Creates the Axum application router with shared state.
 fn app(app_state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/health", get(health_check))
         .route("/solve", post(solve_handler))
-        // Add a new route to test the executor
         .route("/test_execute", post(test_execute_handler))
         .route("/execute", post(execute_handler))
+        .layer(cors)
         .with_state(app_state)
 }
 
