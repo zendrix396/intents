@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Navbar } from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "Documentation | Solana Intents",
@@ -10,5 +11,10 @@ export default function DocsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <Navbar />
+      {children}
+    </div>
+  );
 }

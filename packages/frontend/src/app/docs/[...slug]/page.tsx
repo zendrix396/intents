@@ -35,7 +35,7 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
     if (!doc) notFound();
 
     return (
-      <div className="flex min-h-screen bg-black text-white">
+      <div className="flex">
         <DocsSidebar docs={docs} />
         <main className="flex-1 overflow-auto">
           <div className="max-w-3xl mx-auto px-8 py-12">
@@ -50,7 +50,7 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
   if (!doc) notFound();
 
   return (
-    <div className="flex min-h-screen bg-black text-white">
+    <div className="flex">
       <DocsSidebar docs={docs} />
       <main className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-8 py-12">

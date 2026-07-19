@@ -14,5 +14,5 @@ export async function MdxContent({ source }: { source: string }) {
     },
   });
 
-  return <>{content}</>;
+  return <div className="prose prose-invert max-w-none">{content}</div>;
 }
