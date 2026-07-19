@@ -81,8 +81,26 @@ export default function Home() {
               </>
             ) : (
               <>
-                <h1 className="text-2xl font-semibold tracking-tight">Connect your wallet</h1>
-                <p className="text-white/70 text-sm">Start by connecting a Solana wallet to continue.</p>
+                <h1 className="text-3xl font-semibold tracking-tight mb-2">
+                  Intent-Centric Execution for Solana
+                </h1>
+                <p className="text-white/50 text-sm max-w-md text-center mb-4">
+                  State your goal, not the steps. Our solver finds the best route across DEXs and executes it for you.
+                </p>
+                <div className="grid grid-cols-3 gap-4 w-full mb-2">
+                  <div className="text-center space-y-1">
+                    <div className="text-white/80 text-lg font-medium">Auto-Routed</div>
+                    <div className="text-white/40 text-xs">Best rate across multiple DEXs</div>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <div className="text-white/80 text-lg font-medium">Low Fees</div>
+                    <div className="text-white/40 text-xs">Dynamic priority fee estimation</div>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <div className="text-white/80 text-lg font-medium">Self-Custody</div>
+                    <div className="text-white/40 text-xs">You sign every transaction</div>
+                  </div>
+                </div>
               </>
             )}
           </div>

@@ -29,13 +29,15 @@ intents/
 │   └── frontend/           # Web UI (Next.js)
 │       ├── package.json
 │       ├── next.config.ts
+│       ├── content/docs/   # MDX documentation pages
 │       └── src/
 │           ├── app/
 │           │   ├── page.tsx
 │           │   ├── layout.tsx
+│           │   ├── docs/
 │           │   └── lib/
 │           └── components/
-├── docs/                   # Documentation source
+├── docs/                   # Project planning docs
 └── .github/workflows/      # CI configuration
 ```
 
@@ -129,10 +131,8 @@ No test framework is currently configured. Consider adding Vitest for unit tests
 
 GitHub Actions runs on every push to `main`:
 
-1. **Rust CI**: `cargo clippy`, `cargo build`, `cargo test`
-2. Caching via `Swatinem/rust-cache`
-
-To add frontend CI, create a new job in `.github/workflows/ci.yml`.
+1. **Rust CI** (`.github/workflows/ci.yml`): `cargo clippy`, `cargo build`, `cargo test` with `Swatinem/rust-cache`
+2. **Frontend CI** (`.github/workflows/frontend-ci.yml`): `npm ci`, lint, type check, and build — triggered on changes to `packages/frontend/**`
 
 ## Code Style
 
