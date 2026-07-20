@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { getQuote, executeSwap, SwapIntent, JupiterOrderResponse, ExecuteResponse } from "@/app/lib/api";
+import { addSwapToHistory } from "./TransactionHistory";
 
 const TOKEN_OPTIONS = [
   { mint: "So11111111111111111111111111111111111111112", symbol: "SOL", decimals: 9 },
@@ -85,6 +86,14 @@ export function IntentForm({ onQuoteReceived, onSwapExecuted }: IntentFormProps)
       setTxSignature(result.signature);
       setExecDetails(result);
       onSwapExecuted?.(result.signature);
+
+      addSwapToHistory({
+        inputSymbol: inputToken.symbol,
+        outputSymbol: outputToken.symbol,
+        inputAmount: (parseFloat(result.inAmount) / Math.pow(10, inputToken.decimals)).toFixed(inputToken.decimals > 6 ? 6 : inputToken.decimals),
+        outputAmount: (parseFloat(result.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 6 : outputToken.decimals),
+        signature: result.signature,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to execute swap");
     } finally {

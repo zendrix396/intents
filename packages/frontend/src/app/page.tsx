@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { IntentForm } from "@/components/IntentForm";
 import { NetworkStatus } from "@/components/NetworkStatus";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -79,6 +80,9 @@ export default function Home() {
 
                 {/* Intent Form */}
                 <IntentForm />
+
+                {/* Transaction History */}
+                <TransactionHistory />
               </>
             ) : (
               <>

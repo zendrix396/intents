@@ -1,0 +1,87 @@
+---
+title: FAQ
+description: Frequently asked questions about the Solana Intents platform
+order: 5
+---
+
+# Frequently Asked Questions
+
+## General
+
+### What is Solana Intents?
+
+Solana Intents is an intent-centric execution layer for Solana. Instead of manually finding the best DEX route and constructing transactions, you simply state your goal (e.g., "swap 1 SOL for USDC") and the solver finds the optimal path across multiple DEXs.
+
+### Which wallets are supported?
+
+Phantom and Solflare. Both are available as browser extensions and mobile apps. Click **Connect Wallet** in the top-right corner to connect.
+
+### Is this on mainnet or devnet?
+
+The platform currently runs on **devnet**. All tokens used are devnet tokens. Do not send real SOL or mainnet tokens to the addresses shown in the app.
+
+### Does the solver take a fee?
+
+The solver charges no additional fees beyond standard Solana network transaction fees and Jupiter's built-in fees. Priority fees are dynamically estimated based on current network conditions.
+
+## Swaps
+
+### How does routing work?
+
+When you request a quote, the solver queries Jupiter's Ultra API, which aggregates liquidity across multiple Solana DEXs (Raydium, Orca, Meteora, etc.) to find the best available rate for your swap.
+
+### What is slippage?
+
+Slippage is the maximum acceptable difference between the quoted price and the execution price. For example, with 0.5% slippage, if the quoted rate changes by more than 0.5% before your transaction lands, the swap will fail rather than execute at a worse price.
+
+### What tokens can I swap?
+
+The frontend supports SOL, USDC, USDT, mSOL, and wSOL. The solver can route any SPL token pair through Jupiter, but the UI currently only exposes these five tokens.
+
+### What happens if my transaction fails?
+
+The solver retries failed transactions up to 3 times with exponential backoff (1s, 2s, 4s) for transient errors. Permanent failures (invalid signatures, insufficient funds) are not retried. You will see an error message in the UI.
+
+### How do priority fees work?
+
+The solver automatically estimates priority fees based on current network conditions using a multi-percentile approach. Higher priority fees increase the chance of fast transaction inclusion. You can see the current fee levels in the Network Status indicator.
+
+## Technical
+
+### What is the API endpoint?
+
+The solver-service exposes a REST API at `http://localhost:3000` (configurable via `BIND_ADDR`). See the [API Reference](/docs/api-reference) for full documentation.
+
+### Can I run the solver locally?
+
+Yes. Clone the repo, configure your `.env` with an RPC URL and wallet keys, then run `cargo run` in `packages/solver-service`. See the [Development Guide](/docs/development) for details.
+
+### How does transaction simulation work?
+
+Before submitting a transaction, the solver runs a pre-flight simulation via the Solana RPC. If the simulation fails (e.g., insufficient balance, slippage exceeded), the transaction is rejected before any SOL is spent on gas fees.
+
+### What happens to my wallet keys?
+
+Your wallet keys never leave your browser. The solver-service uses its own payer wallet for signing and submitting transactions. Your wallet is only used to identify you as the intended recipient of the swapped tokens.
+
+## Troubleshooting
+
+### The quote shows an error
+
+This usually means Jupiter cannot find a valid route for the selected token pair on devnet. Try:
+- Using a different token pair
+- Changing the amount
+- Checking that you're connected to devnet in your wallet
+
+### The swap fails to execute
+
+Common causes:
+- Insufficient SOL for transaction fees
+- The quote expired (quotes are time-sensitive)
+- Network congestion caused a timeout
+
+The solver will automatically retry transient failures. If it persists, try getting a fresh quote.
+
+### The network status shows unhealthy RPC
+
+The Network Status indicator polls `/health` every 30 seconds. If it shows unhealthy endpoints, the solver will automatically failover to healthy ones. If all endpoints are down, check your `RPC_URL` configuration.
