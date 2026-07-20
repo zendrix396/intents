@@ -1,3 +1,4 @@
+use axum::http::HeaderValue;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -8,8 +9,7 @@ use axum::{
 use base64::Engine;
 use serde::Serialize;
 use serde_json::{json, Value};
-use solana_sdk::signature::Signer;
-use solana_sdk::{message::Message, system_instruction, transaction::VersionedTransaction};
+use solana_sdk::transaction::VersionedTransaction;
 use solver_core::{
     executor::TransactionExecutor,
     fee_estimator::FeeEstimator,
@@ -18,7 +18,7 @@ use solver_core::{
 };
 use std::env;
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 mod payer_manager;
 use payer_manager::PayerManager;
@@ -76,16 +76,35 @@ async fn main() {
 }
 
 fn app(app_state: AppState) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = if let Ok(origin) = env::var("ALLOWED_ORIGIN") {
+        match origin.parse::<HeaderValue>() {
+            Ok(val) => {
+                tracing::info!(origin = %origin, "Configuring CORS for specific origin");
+                CorsLayer::new()
+                    .allow_origin(AllowOrigin::exact(val))
+                    .allow_methods(Any)
+                    .allow_headers(Any)
+            }
+            Err(_) => {
+                tracing::warn!("Invalid ALLOWED_ORIGIN value, falling back to allow all");
+                CorsLayer::new()
+                    .allow_origin(Any)
+                    .allow_methods(Any)
+                    .allow_headers(Any)
+            }
+        }
+    } else {
+        tracing::info!("CORS configured to allow all origins");
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     Router::new()
         .route("/health", get(health_check))
         .route("/fees", get(fees_handler))
         .route("/solve", post(solve_handler))
-        .route("/test_execute", post(test_execute_handler))
         .route("/execute", post(execute_handler))
         .layer(cors)
         .with_state(app_state)
@@ -182,52 +201,6 @@ async fn solve_handler(
                 format!("Failed to get order from Jupiter: {e}"),
             ))
         }
-    }
-}
-
-async fn test_execute_handler(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, (StatusCode, String)> {
-    tracing::info!("Processing /test_execute request");
-    let payer = state.payer_manager.get_keypair();
-    let client = state.connection_manager.get_healthy_client().await;
-
-    let instruction = system_instruction::transfer(&payer.pubkey(), &payer.pubkey(), 1_000_000);
-
-    let (blockhash, _) = client
-        .get_latest_blockhash_with_commitment(client.commitment())
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to get blockhash");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get blockhash: {}", e),
-            )
-        })?;
-
-    let message = solana_sdk::message::VersionedMessage::Legacy(Message::new_with_blockhash(
-        &[instruction],
-        Some(&payer.pubkey()),
-        &blockhash,
-    ));
-
-    let tx = VersionedTransaction::try_new(message, &[payer]).map_err(|e| {
-        tracing::error!(error = %e, "Failed to sign transaction");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to sign transaction: {}", e),
-        )
-    })?;
-
-    match state.executor.execute_transaction(&tx).await {
-        Ok(signature) => {
-            tracing::info!(signature = %signature, "Test execute successful");
-            Ok(Json(json!({ "signature": signature.to_string() })))
-        }
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Execution failed: {}", e),
-        )),
     }
 }
 

@@ -37,10 +37,6 @@ impl PayerManager {
         self.keypair.pubkey()
     }
 
-    pub fn get_keypair(&self) -> &Keypair {
-        &self.keypair
-    }
-
     pub fn start_balance_monitor(self: &Arc<Self>) {
         let self_clone = self.clone();
         tokio::spawn(async move {

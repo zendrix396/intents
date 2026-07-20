@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 /// Represents the user's intent, now including the taker address.
 #[derive(Deserialize, Debug, Clone)]
@@ -60,6 +61,11 @@ pub struct JupiterOrderResponse {
     pub error_message: Option<String>,
 }
 
+fn shared_http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(reqwest::Client::default)
+}
+
 /// Solves a swap intent using Jupiter's Ultra Order API.
 pub async fn solve_swap_intent_with_jupiter(
     intent: &SwapIntent,
@@ -76,7 +82,7 @@ pub async fn solve_swap_intent_with_jupiter(
         intent.slippage_bps
     );
 
-    let client = reqwest::Client::new();
+    let client = shared_http_client();
     let response = client.get(&url).send().await?;
 
     let order_response = response.json::<JupiterOrderResponse>().await?;
